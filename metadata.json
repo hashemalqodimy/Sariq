@@ -1,0 +1,6 @@
+{
+  "name": "أمان فون",
+  "description": "تطبيق البلاغات عن الجوالات المسروقة والمفقودة في الجمهورية اليمنية مع نظام تنبيهات فوري وفحص IMEI لكافة المحافظات",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
