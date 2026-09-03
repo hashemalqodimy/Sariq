@@ -1,52 +1,170 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Security Shield Outer -->
-    <path
-        android:fillColor="#1E40AF"
-        android:strokeColor="#60A5FA"
-        android:strokeWidth="2.5"
-        android:pathData="M54,23 L79,33 C79,57 68,75 54,84 C40,75 29,57 29,33 Z" />
 
-    <!-- Security Shield Inner Glow -->
+    <!-- 1. Luxurious 3D Beveled Outer Golden Crest Shield -->
     <path
-        android:fillColor="#2563EB"
-        android:pathData="M54,27 L75,35.5 C75,55 65,71.5 54,79.5 C43,71.5 33,55 33,35.5 Z" />
+        android:pathData="M54,16 L84,28 C84,60 70,81 54,91 C38,81 24,60 24,28 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:angle="45"
+                android:startColor="#F59E0B"
+                android:centerColor="#FDE68A"
+                android:endColor="#B45309"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
 
-    <!-- Phone Silhouette Inside Shield -->
+    <!-- 2. Shield Inner Bevel Inset (Deep Sapphire & Royal Midnight) -->
+    <path
+        android:pathData="M54,19.5 L81,30.5 C81,58 68,77.5 54,87 C40,77.5 27,58 27,30.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:angle="90"
+                android:startColor="#0A1120"
+                android:centerColor="#111C33"
+                android:endColor="#060A14"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
+
+    <!-- 3. Inner Cyber Shield Border (Electric Cyan Pulse) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="1.2"
+        android:strokeAlpha="0.8"
+        android:pathData="M54,22 L78,32.5 C78,56 66,74 54,83 C42,74 30,56 30,32.5 Z" />
+
+    <!-- 4. Modern Smartphone Silhouette in Center -->
+    <path
+        android:pathData="M44,30 H64 C66.2,30 67.5,31.3 67.5,33.5 V65 C67.5,67.2 66.2,68.5 64,68.5 H44 C41.8,68.5 40.5,67.2 40.5,65 V33.5 C40.5,31.3 41.8,30 44,30 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:angle="90"
+                android:startColor="#1E3A8A"
+                android:endColor="#0284C7"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
+
+    <!-- OLED Screen Surface inside Phone -->
+    <path
+        android:fillColor="#030712"
+        android:pathData="M42,33.5 H66 V63.5 H42 Z" />
+
+    <!-- Speaker Pill at Top -->
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M51.5,31.8 H56.5 V32.5 H51.5 Z" />
+
+    <!-- 5. Tracking Radar Circular Waves -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="1.0"
+        android:strokeAlpha="0.4"
+        android:pathData="M54,47.5m-11,0a11,11 0 1,0 22,0a11,11 0 1,0 -22,0" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="1.4"
+        android:strokeAlpha="0.75"
+        android:pathData="M54,47.5m-6.5,0a6.5,6.5 0 1,0 13,0a6.5,6.5 0 1,0 -13,0" />
+
+    <!-- 6. Central Solid Gold Padlock -->
+    <!-- Padlock Shackle -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FDE68A"
+        android:strokeWidth="1.8"
+        android:pathData="M51,46.5 V44 C51,42.4 52.3,41.2 54,41.2 C55.7,41.2 57,42.4 57,44 V46.5" />
+
+    <!-- Padlock Body -->
+    <path
+        android:pathData="M49,46.5 H59 C60,46.5 60.5,47 60.5,48 V53 C60.5,54 60,54.5 59,54.5 H49 C48,54.5 47.5,54 47.5,53 V48 C47.5,47 48,46.5 49,46.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:angle="45"
+                android:startColor="#F59E0B"
+                android:endColor="#FDE68A"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
+
+    <!-- Keyhole -->
     <path
         android:fillColor="#0F172A"
-        android:strokeColor="#93C5FD"
-        android:strokeWidth="1.2"
-        android:pathData="M43,36 H65 C66.5,36 67,37.5 67,39 V68 C67,69.5 66.5,71 65,71 H43 C41.5,71 41,69.5 41,68 V39 C41,37.5 41.5,36 43,36 Z" />
+        android:pathData="M54,49.5m-0.9,0a0.9,0.9 0 1,0 1.8,0a0.9,0.9 0 1,0 -1.8,0" />
 
-    <!-- Phone Screen Display Area -->
+    <!-- 7. 'أَمَان' Sculpted Golden Arabic Typography Plate -->
+    <!-- Base Plate -->
     <path
-        android:fillColor="#1E293B"
-        android:pathData="M43.5,41 H64.5 V65 H43.5 Z" />
+        android:pathData="M44.5,56.5 H63.5 C64.6,56.5 65.5,57.4 65.5,58.5 V61.5 C65.5,62.6 64.6,63.5 63.5,63.5 H44.5 C43.4,63.5 42.5,62.6 42.5,61.5 V58.5 C42.5,57.4 43.4,56.5 44.5,56.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:angle="90"
+                android:startColor="#0F172A"
+                android:endColor="#1E293B"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
 
-    <!-- Alert / Search Signal Waves on Phone Screen -->
+    <!-- Gold Border on Plate -->
     <path
-        android:fillColor="#EF4444"
-        android:pathData="M54,45 C51,45 49,47 49,50 C49,53.5 54,58 54,58 C54,58 59,53.5 59,50 C59,47 57,45 54,45 Z" />
+        android:fillColor="#00000000"
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="0.8"
+        android:pathData="M44.5,56.5 H63.5 C64.6,56.5 65.5,57.4 65.5,58.5 V61.5 C65.5,62.6 64.6,63.5 63.5,63.5 H44.5 C43.4,63.5 42.5,62.6 42.5,61.5 V58.5 C42.5,57.4 43.4,56.5 44.5,56.5 Z" />
 
+    <!-- Stylized Arabic Calligraphy Lettering: 'أَمَان' in Radiant Solid Gold Vector Strokes -->
+    <!-- Alif (أ) with Hamza -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,48 M54,48 A2,2 0 1,0 54,52 A2,2 0 1,0 54,48" />
-
-    <!-- Phone Speaker Notch and Home Pill -->
-    <path
-        android:fillColor="#94A3B8"
-        android:pathData="M51,38.5 H57 V39.5 H51 Z" />
-    <path
-        android:fillColor="#94A3B8"
-        android:pathData="M51,67.5 H57 V68.5 H51 Z" />
-
-    <!-- Warning / Stolen Beacon Star at top right of shield -->
+        android:fillColor="#FDE68A"
+        android:pathData="M61.8,57.8 H62.6 V62.2 H61.8 Z" />
     <path
         android:fillColor="#F59E0B"
-        android:pathData="M73,26 L75,31 L80,31 L76,34 L78,39 L73,36 L68,39 L70,34 L66,31 L71,31 Z" />
+        android:pathData="M61.8,57.2 C62.2,57.0 62.6,57.1 62.6,57.4 C62.4,57.6 62.0,57.6 61.8,57.5 Z" />
+
+    <!-- Meem (م) loop & connector -->
+    <path
+        android:fillColor="#FDE68A"
+        android:pathData="M56.8,59.8 C56.8,59.0 57.6,58.6 58.4,58.6 C59.2,58.6 60.0,59.1 60.0,60.0 C60.0,60.8 59.2,61.4 58.4,61.4 C57.6,61.4 56.8,60.8 56.8,59.8 Z M58.4,59.3 C58.0,59.3 57.6,59.6 57.6,60.0 C57.6,60.4 58.0,60.7 58.4,60.7 C58.8,60.7 59.2,60.4 59.2,60.0 C59.2,59.6 58.8,59.3 58.4,59.3 Z" />
+    <path
+        android:fillColor="#FDE68A"
+        android:pathData="M56.8,60.8 H61.8 V61.6 H56.8 Z" />
+
+    <!-- Middle Alif (ا) of Aman -->
+    <path
+        android:fillColor="#FDE68A"
+        android:pathData="M55.0,57.8 H55.8 V62.2 H55.0 Z" />
+
+    <!-- Noon (ن) bowl & Dot -->
+    <!-- Noon Bowl Arc -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FDE68A"
+        android:strokeWidth="0.9"
+        android:pathData="M48.8,59.6 C48.8,61.8 50.4,62.4 52.4,62.4 C54.4,62.4 55.2,61.6 55.2,60.8" />
+    <!-- Noon Nuqtah (Dot) in Solid Gold -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M52.0,58.0 L52.6,58.6 L52.0,59.2 L51.4,58.6 Z" />
+
+    <!-- 8. Crown Security Star at Apex -->
+    <path
+        android:pathData="M54,12 L55.6,16 L59.8,16.2 L56.4,18.8 L57.5,23 L54,20.6 L50.5,23 L51.6,18.8 L48.2,16.2 L52.4,16 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:angle="90"
+                android:startColor="#FDE68A"
+                android:endColor="#F59E0B"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
+
 </vector>

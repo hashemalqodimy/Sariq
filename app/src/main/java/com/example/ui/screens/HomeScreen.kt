@@ -43,6 +43,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.AmanPhoneViewModel
+import com.example.ui.components.AmanPhoneLogoDesign
+import com.example.ui.components.IconConcept
+import com.example.ui.components.IconSelectorShowcase
 import com.example.ui.components.ReportCard
 import com.example.ui.components.UrgentAlertBanner
 import com.example.ui.components.YemenFlagBadge
@@ -80,6 +86,8 @@ fun HomeScreen(
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
 
     val topAlert = allAlerts.firstOrNull { it.severity == "CRITICAL" } ?: allAlerts.firstOrNull()
+    var selectedIconConcept by remember { mutableStateOf(IconConcept.CYBER_GOLD_SHIELD) }
+    var showIconPicker by remember { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -122,17 +130,30 @@ fun HomeScreen(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 }
-                                Surface(
-                                    color = Color(0x3360A5FA),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        text = "نظام البث الموحد",
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        color = Color(0x3310B981),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .background(Color(0xFF34D399), CircleShape)
+                                            )
+                                            Spacer(modifier = Modifier.width(5.dp))
+                                            Text(
+                                                text = "مزامنة سحابية نشطة",
+                                                color = Color(0xFFD1FAE5),
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
@@ -163,18 +184,50 @@ fun HomeScreen(
                                 }
                             }
 
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AmanPhoneLogoDesign(
+                                    concept = selectedIconConcept,
+                                    size = 56.dp,
+                                    modifier = Modifier.clickable { showIconPicker = !showIconPicker }
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "المنصة الوطنية للبلاغات وحماية الهواتف",
+                                        color = Color.White,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "تعميم فوري للبلاغات لكافة محلات الجوالات والمواطنين في الـ 22 محافظة",
+                                        color = Color(0xFFCBD5E1),
+                                        fontSize = 11.5.sp
+                                    )
+                                }
+                            }
+
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "المنصة الوطنية للبلاغات وحماية الهواتف",
-                                color = Color.White,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "تعميم فوري للبلاغات لكافة محلات الجوالات والمواطنين في الـ 22 محافظة",
-                                color = Color(0xFFCBD5E1),
-                                fontSize = 12.sp
-                            )
+                            Surface(
+                                color = Color.White.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.clickable { showIconPicker = !showIconPicker }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (showIconPicker) "إغلاق استعراض الأيقونات ▲" else "تغيير تصميم أيقونة أَمَان فُون (4 مقترحات) 🎨",
+                                        color = Color(0xFFFDE68A),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
 
                             Spacer(modifier = Modifier.height(14.dp))
 
@@ -201,6 +254,16 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // Icon Selection Showcase (if toggled)
+            if (showIconPicker) {
+                item {
+                    IconSelectorShowcase(
+                        selectedConcept = selectedIconConcept,
+                        onSelectConcept = { selectedIconConcept = it }
+                    )
                 }
             }
 

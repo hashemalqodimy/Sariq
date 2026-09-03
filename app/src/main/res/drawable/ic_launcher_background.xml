@@ -5,36 +5,49 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Premium Deep Midnight & Royal Navy Canvas -->
     <path
         android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:angle="135"
-                android:endColor="#0F172A"
-                android:startColor="#1E3A8A"
+                android:endColor="#030712"
+                android:centerColor="#0B1528"
+                android:startColor="#0F172A"
                 android:type="linear" />
         </aapt:attr>
     </path>
-    <!-- Subtle radar circle rings -->
+
+    <!-- Radial golden ambient cyber glow behind shield -->
+    <path
+        android:pathData="M54,54m-46,0a46,46 0 1,0 92,0a46,46 0 1,0 -92,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="50"
+                android:gradientRadius="48"
+                android:startColor="#25D97706"
+                android:endColor="#00000000"
+                android:type="radial" />
+        </aapt:attr>
+    </path>
+
+    <!-- Precision Hexagonal Grid & Telemetry Lines -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M54,54m-42,0a42,42 0 1,0 84,0a42,42 0 1,0 -84,0"
-        android:strokeWidth="0.75"
-        android:strokeColor="#2260A5FA" />
+        android:strokeColor="#1E38BDF8"
+        android:strokeWidth="0.6"
+        android:pathData="M54,14 L90,34 L90,74 L54,94 L18,74 L18,34 Z" />
+
     <path
         android:fillColor="#00000000"
-        android:pathData="M54,54m-28,0a28,28 0 1,0 56,0a28,28 0 1,0 -56,0"
-        android:strokeWidth="0.75"
-        android:strokeColor="#3360A5FA" />
+        android:strokeColor="#25F59E0B"
+        android:strokeWidth="0.8"
+        android:pathData="M54,54m-38,0a38,38 0 1,0 76,0a38,38 0 1,0 -76,0" />
+
     <path
         android:fillColor="#00000000"
-        android:pathData="M54,54m-16,0a16,16 0 1,0 32,0a16,16 0 1,0 -32,0"
-        android:strokeWidth="0.75"
-        android:strokeColor="#4460A5FA" />
-    <!-- Grid overlay lines -->
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M54,12L54,96M12,54L96,54"
+        android:strokeColor="#1538BDF8"
         android:strokeWidth="0.5"
-        android:strokeColor="#2238BDF8" />
+        android:pathData="M54,6 L54,102 M6,54 L102,54 M20,20 L88,88 M88,20 L20,88" />
 </vector>

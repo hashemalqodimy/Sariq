@@ -66,7 +66,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AppUser
+import com.example.ui.components.AmanPhoneLogoDesign
 import com.example.ui.components.GoogleAccountChooserDialog
+import com.example.ui.components.IconConcept
+import com.example.ui.components.IconSelectorShowcase
 import com.example.ui.components.YemenFlagBadge
 import com.example.ui.theme.AccentGold
 import com.example.ui.theme.Navy700
@@ -97,6 +100,8 @@ fun WelcomeScreen(
     var isGoogleLoading by remember { mutableStateOf(false) }
     var showGoogleChooser by remember { mutableStateOf(false) }
     var isContentVisible by remember { mutableStateOf(false) }
+    var selectedIconConcept by remember { mutableStateOf(IconConcept.CYBER_GOLD_SHIELD) }
+    var showIconPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         isContentVisible = true
@@ -197,45 +202,30 @@ fun WelcomeScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // App Emblem Icon with glow
-                    Box(
+                    // App Emblem Icon with glow and modern design with 'أَمَان' inside
+                    AmanPhoneLogoDesign(
+                        concept = selectedIconConcept,
+                        size = 110.dp,
                         modifier = Modifier
-                            .size(100.dp)
-                            .shadow(24.dp, shape = CircleShape, ambientColor = AccentGold, spotColor = AccentGold)
-                            .background(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        Navy800,
-                                        Navy900
-                                    )
-                                ),
-                                shape = CircleShape
-                            )
-                            .border(2.5.dp, AccentGold, CircleShape),
-                        contentAlignment = Alignment.Center
+                            .clickable { showIconPicker = !showIconPicker }
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        color = Color(0x33F59E0B),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.clickable { showIconPicker = !showIconPicker }
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(76.dp)
-                                .background(Color(0xFF1E293B), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = "أمان فون",
-                                tint = AccentGold,
-                                modifier = Modifier.size(44.dp)
-                            )
-                            Icon(
-                                imageVector = Icons.Default.PhoneAndroid,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        Text(
+                            text = if (showIconPicker) "إخفاء معرض الأيقونات ▲" else "تغيير شكل الأيقونة (4 خيارات) 🎨",
+                            color = Color(0xFFFDE68A),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
                         text = "أَمَان فُون",
@@ -434,6 +424,14 @@ fun WelcomeScreen(
                             modifier = Modifier
                                 .clickable { onGuestContinue() }
                                 .padding(6.dp)
+                        )
+                    }
+
+                    if (showIconPicker) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        IconSelectorShowcase(
+                            selectedConcept = selectedIconConcept,
+                            onSelectConcept = { selectedIconConcept = it }
                         )
                     }
                 }

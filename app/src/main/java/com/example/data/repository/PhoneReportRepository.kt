@@ -9,8 +9,13 @@ import com.example.data.model.AppUser
 import com.example.data.model.ImeiCheckRecord
 import com.example.data.model.PhoneReport
 import com.example.data.model.UrgentAlert
+import com.example.util.CloudSyncManager
 import com.example.util.NotificationHelper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 class PhoneReportRepository(
@@ -18,14 +23,71 @@ class PhoneReportRepository(
     private val alertDao: AlertDao,
     private val imeiCheckDao: ImeiCheckDao,
     private val userDao: UserDao,
-    private val context: Context
+    private val context: Context,
+    private val externalScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 ) {
+    val cloudSyncManager = CloudSyncManager(context)
+
     val allReports: Flow<List<PhoneReport>> = reportDao.getAllReports()
     val allAlerts: Flow<List<UrgentAlert>> = alertDao.getAllAlerts()
     val unreadAlertsCount: Flow<Int> = alertDao.getUnreadCount()
     val totalReportsCount: Flow<Int> = reportDao.getTotalReportsCount()
     val recoveredReportsCount: Flow<Int> = reportDao.getRecoveredReportsCount()
     val recentImeiChecks: Flow<List<ImeiCheckRecord>> = imeiCheckDao.getRecentChecks()
+
+    init {
+        // Start real-time cloud observation and auto-sync
+        startCloudSynchronization()
+    }
+
+    private fun startCloudSynchronization() {
+        if (!cloudSyncManager.isCloudConnected) return
+
+        // Sync incoming cloud reports into local database so all devices have them
+        externalScope.launch {
+            try {
+                cloudSyncManager.observeCloudReports().collect { cloudReports ->
+                    for (cloudReport in cloudReports) {
+                        val localMatch = reportDao.findReportByExactImei(cloudReport.imei1)
+                        if (localMatch == null) {
+                            reportDao.insertReport(cloudReport)
+                        } else if (localMatch.status != cloudReport.status) {
+                            reportDao.updateStatus(localMatch.id, cloudReport.status)
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+
+        // Sync incoming urgent alerts from other devices and trigger notifications
+        externalScope.launch {
+            try {
+                cloudSyncManager.observeCloudAlerts().collect { cloudAlerts ->
+                    for (alert in cloudAlerts) {
+                        val existingAlerts = alertDao.getAllAlerts().firstOrNull() ?: emptyList()
+                        val alreadyExists = existingAlerts.any {
+                            it.phoneModel == alert.phoneModel &&
+                                    it.governorate == alert.governorate &&
+                                    (it.timestamp - alert.timestamp).let { diff -> diff in -60000..60000 }
+                        }
+                        if (!alreadyExists) {
+                            val id = alertDao.insertAlert(alert)
+                            NotificationHelper.showUrgentAlertNotification(
+                                context = context,
+                                id = (id % 10000).toInt(),
+                                title = alert.title,
+                                message = alert.message,
+                                governorate = alert.governorate,
+                                phoneModel = alert.phoneModel
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     // Authentication & User profile methods
     suspend fun getUserByEmail(email: String): AppUser? = userDao.getUserByEmail(email.trim().lowercase())
@@ -62,7 +124,17 @@ class PhoneReportRepository(
 
     suspend fun checkImei(rawImei: String): Pair<PhoneReport?, Boolean> {
         val cleanImei = rawImei.trim().filter { it.isDigit() }
-        val foundReport = reportDao.findReportByExactImei(cleanImei)
+        var foundReport = reportDao.findReportByExactImei(cleanImei)
+
+        // If not found in local cache, query centralized cloud directly
+        if (foundReport == null && cloudSyncManager.isCloudConnected) {
+            val cloudReport = cloudSyncManager.searchImeiInCloud(cleanImei)
+            if (cloudReport != null) {
+                reportDao.insertReport(cloudReport)
+                foundReport = cloudReport
+            }
+        }
+
         val isStolen = foundReport != null && (foundReport.status == "مسروق" || foundReport.status == "مفقود")
 
         imeiCheckDao.insertCheck(
@@ -100,6 +172,14 @@ class PhoneReportRepository(
         )
         alertDao.insertAlert(alert)
 
+        // Push to cloud so ALL other users, stores, and police stations receive it instantly
+        externalScope.launch {
+            try {
+                cloudSyncManager.publishReportToCloud(report)
+            } catch (_: Exception) {
+            }
+        }
+
         // Show native Android notification
         NotificationHelper.showUrgentAlertNotification(
             context = context,
@@ -115,6 +195,18 @@ class PhoneReportRepository(
 
     suspend fun updateReportStatus(reportId: Long, newStatus: String, phoneModel: String, gov: String) {
         reportDao.updateStatus(reportId, newStatus)
+
+        // Sync update to cloud
+        externalScope.launch {
+            try {
+                val report = reportDao.getAllReports().firstOrNull()?.find { it.id == reportId }
+                if (report != null) {
+                    cloudSyncManager.updateReportStatusInCloud(report.imei1, newStatus)
+                }
+            } catch (_: Exception) {
+            }
+        }
+
         if (newStatus == "تم الاسترجاع") {
             val alert = UrgentAlert(
                 reportId = reportId,
