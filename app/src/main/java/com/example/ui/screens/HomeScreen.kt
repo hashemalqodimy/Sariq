@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,6 +68,7 @@ import com.example.ui.components.YemenFlagBadge
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.PrimaryBlue
 import com.example.ui.theme.SuccessGreen
+import com.example.util.NotificationHelper
 import com.example.util.YemenData
 
 @Composable
@@ -88,6 +90,8 @@ fun HomeScreen(
     val topAlert = allAlerts.firstOrNull { it.severity == "CRITICAL" } ?: allAlerts.firstOrNull()
     var selectedIconConcept by remember { mutableStateOf(IconConcept.CYBER_GOLD_SHIELD) }
     var showIconPicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val notificationsEnabled = remember(context) { NotificationHelper.areNotificationsEnabled(context) }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -264,6 +268,52 @@ fun HomeScreen(
                         selectedConcept = selectedIconConcept,
                         onSelectConcept = { selectedIconConcept = it }
                     )
+                }
+            }
+
+            // Notification Permission Warning (If Android disabled notifications)
+            if (!notificationsEnabled) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF450A0A)),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { NotificationHelper.openNotificationSettings(context) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "⚠️", fontSize = 24.sp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "تنبيه: الإشعارات معطلة في جهازك!",
+                                    color = Color(0xFFFECACA),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp
+                                )
+                                Text(
+                                    text = "لن تصلك تعميمات وبلاغات سرقة الهواتف. اضغط هنا لتفعيل إشعارات التطبيق.",
+                                    color = Color(0xFFFCA5A5),
+                                    fontSize = 11.5.sp
+                                )
+                            }
+                            Surface(
+                                color = AlertRed,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "تفعيل",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

@@ -38,11 +38,10 @@ class PhoneReportRepository(
     init {
         // Start real-time cloud observation and auto-sync
         startCloudSynchronization()
+        com.example.util.AmanSyncReceiver.schedulePeriodicSync(context)
     }
 
     private fun startCloudSynchronization() {
-        if (!cloudSyncManager.isCloudConnected) return
-
         // Sync incoming cloud reports into local database so all devices have them
         externalScope.launch {
             try {
@@ -69,18 +68,21 @@ class PhoneReportRepository(
                         val alreadyExists = existingAlerts.any {
                             it.phoneModel == alert.phoneModel &&
                                     it.governorate == alert.governorate &&
-                                    (it.timestamp - alert.timestamp).let { diff -> diff in -60000..60000 }
+                                    (it.timestamp - alert.timestamp).let { diff -> diff in -120000..120000 }
                         }
                         if (!alreadyExists) {
                             val id = alertDao.insertAlert(alert)
-                            NotificationHelper.showUrgentAlertNotification(
-                                context = context,
-                                id = (id % 10000).toInt(),
-                                title = alert.title,
-                                message = alert.message,
-                                governorate = alert.governorate,
-                                phoneModel = alert.phoneModel
-                            )
+                            val isFresh = (System.currentTimeMillis() - alert.timestamp) < (3 * 3600 * 1000L)
+                            if (isFresh) {
+                                NotificationHelper.showUrgentAlertNotification(
+                                    context = context,
+                                    id = (id % 10000).toInt(),
+                                    title = alert.title,
+                                    message = alert.message,
+                                    governorate = alert.governorate,
+                                    phoneModel = alert.phoneModel
+                                )
+                            }
                         }
                     }
                 }

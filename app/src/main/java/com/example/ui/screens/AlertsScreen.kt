@@ -79,6 +79,7 @@ fun AlertsScreen(
 
     var selectedGovFilter by remember { mutableStateOf("الكل") }
     var testNotificationSent by remember { mutableStateOf(false) }
+    val notificationsEnabled = remember(context) { NotificationHelper.areNotificationsEnabled(context) }
 
     val filteredAlerts = if (selectedGovFilter == "الكل") {
         alerts
@@ -155,6 +156,70 @@ fun AlertsScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    if (!notificationsEnabled) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF450A0A)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .clickable { NotificationHelper.openNotificationSettings(context) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "⚠️", fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "الإشعارات محظورة في هذا الهاتف!",
+                                        color = Color(0xFFFECACA),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.5.sp
+                                    )
+                                    Text(
+                                        text = "اضغط هنا للدخول للإعدادات والسماح بالإشعارات لتصلك تنبيهات السرقات فوراً.",
+                                        color = Color(0xFFFCA5A5),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                Surface(
+                                    color = AlertRed,
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "تفعيل",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(SuccessGreen, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "البث السحابي المباشر شغال | النغمة والاهتزاز مفعلة لجميع المحافظات",
+                                color = SuccessGreen,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
                     // Buttons: Test System Notification + Mark all as read
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -162,14 +227,7 @@ fun AlertsScreen(
                     ) {
                         Button(
                             onClick = {
-                                NotificationHelper.showUrgentAlertNotification(
-                                    context = context,
-                                    id = 9999,
-                                    title = "تنبيه سرقة عاجل - تعميم لجميع المحافظات",
-                                    message = "تم الإبلاغ عن سرقة هاتف مسروق جديد. يرجى التحقق من أرقام الـ IMEI.",
-                                    governorate = "صنعاء / عدن",
-                                    phoneModel = "تجربة البث الفوري"
-                                )
+                                NotificationHelper.showTestNotification(context)
                                 testNotificationSent = true
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
@@ -180,7 +238,7 @@ fun AlertsScreen(
                         ) {
                             Icon(imageVector = Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "إرسال إشعار تجريبي", fontSize = 12.sp)
+                            Text(text = "فحص الإشعار الفوري", fontSize = 12.sp)
                         }
 
                         OutlinedButton(
@@ -197,7 +255,7 @@ fun AlertsScreen(
                     if (testNotificationSent) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "✅ تم إرسال إشعار فوري حقيقي في شريط إشعارات الهاتف!",
+                            text = "🔔 تم إرسال إشعار فوري بصوت واهتزاز في شريط النظام بنجاح!",
                             color = SuccessGreen,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
