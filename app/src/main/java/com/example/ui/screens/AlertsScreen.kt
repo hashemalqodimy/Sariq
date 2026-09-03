@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -25,15 +28,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -43,6 +50,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.util.AmanFirebaseMessagingService
 import com.example.data.model.UrgentAlert
 import com.example.ui.AmanPhoneViewModel
 import com.example.ui.theme.AlertRed
@@ -75,11 +84,21 @@ fun AlertsScreen(
 ) {
     val alerts by viewModel.allAlerts.collectAsStateWithLifecycle()
     val unreadCount by viewModel.unreadAlertsCount.collectAsStateWithLifecycle()
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val lastSyncMessage by viewModel.lastSyncMessage.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var selectedGovFilter by remember { mutableStateOf("الكل") }
     var testNotificationSent by remember { mutableStateOf(false) }
     val notificationsEnabled = remember(context) { NotificationHelper.areNotificationsEnabled(context) }
+    var fcmToken by remember { mutableStateOf(AmanFirebaseMessagingService.getSavedToken(context)) }
+    var isFcmRefreshing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        AmanFirebaseMessagingService.initializeFcm(context) { token ->
+            fcmToken = token
+        }
+    }
 
     val filteredAlerts = if (selectedGovFilter == "الكل") {
         alerts
@@ -220,7 +239,7 @@ fun AlertsScreen(
                         }
                     }
 
-                    // Buttons: Test System Notification + Mark all as read
+                    // Buttons: Test System Notification + Cloud Sync + Mark all as read
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -238,7 +257,25 @@ fun AlertsScreen(
                         ) {
                             Icon(imageVector = Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "فحص الإشعار الفوري", fontSize = 12.sp)
+                            Text(text = "فحص الإشعار", fontSize = 11.5.sp)
+                        }
+
+                        Button(
+                            onClick = { viewModel.syncNow() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                            shape = RoundedCornerShape(10.dp),
+                            enabled = !isSyncing,
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .testTag("sync_cloud_now_button")
+                        ) {
+                            if (isSyncing) {
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+                            } else {
+                                Icon(imageVector = Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = if (isSyncing) "جاري المزامنة..." else "مزامنة السحابة 🔄", fontSize = 11.5.sp)
                         }
 
                         OutlinedButton(
@@ -247,13 +284,21 @@ fun AlertsScreen(
                             modifier = Modifier.testTag("mark_all_read_button")
                         ) {
                             Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "تحديد الكل كمقروء", fontSize = 12.sp)
                         }
                     }
 
-                    if (testNotificationSent) {
+                    if (lastSyncMessage != null) {
                         Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = lastSyncMessage ?: "",
+                            color = Color(0xFF10B981),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (testNotificationSent) {
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "🔔 تم إرسال إشعار فوري بصوت واهتزاز في شريط النظام بنجاح!",
                             color = SuccessGreen,
@@ -261,6 +306,153 @@ fun AlertsScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+            }
+        }
+
+        // Firebase Cloud Messaging (FCM) Integration Card
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("fcm_status_card")
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(Color(0xFFF59E0B).copy(alpha = 0.2f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDone,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFBBF24),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "خدمة Firebase Cloud Messaging (FCM)",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "البث المباشر للإشعارات المنبثقة لجميع الأجهزة",
+                                    fontSize = 10.5.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+                        }
+
+                        Surface(
+                            color = Color(0x3310B981),
+                            shape = RoundedCornerShape(6.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "🟢 مفعل ومسجل",
+                                color = Color(0xFF34D399),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = Color(0xFF1E293B))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Subscribed Topics & Token
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "القنوات المشترك بها:",
+                                color = Color(0xFFCBD5E1),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Row(
+                                modifier = Modifier.padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Surface(
+                                    color = Color(0xFF1E293B),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = "#" + AmanFirebaseMessagingService.TOPIC_ALL_REPORTS,
+                                        color = Color(0xFF93C5FD),
+                                        fontSize = 9.5.sp,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Surface(
+                                    color = Color(0xFF1E293B),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = "#" + AmanFirebaseMessagingService.TOPIC_URGENT_ALERTS,
+                                        color = Color(0xFFFCA5A5),
+                                        fontSize = 9.5.sp,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Token Copy Button
+                        if (!fcmToken.isNullOrBlank()) {
+                            OutlinedButton(
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = ClipData.newPlainText("FCM Token", fcmToken)
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "تم نسخ رمز FCM للجهاز بنجاح", Toast.LENGTH_SHORT).show()
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.testTag("copy_fcm_token_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "نسخ التوكن",
+                                    tint = Color(0xFF94A3B8),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "رمز الجهاز",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFFCBD5E1)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "🔒 يتم إرسال البلاغات فورياً لجميع أجهزة محلات الجوالات والأجهزة المسجلة بنظام أندرويد عبر سحابة Google FCM، وتصل حتى لو كان التطبيق مغلقاً.",
+                        fontSize = 10.5.sp,
+                        color = Color(0xFF94A3B8),
+                        lineHeight = 15.sp
+                    )
                 }
             }
         }

@@ -62,8 +62,14 @@ class AmanSyncReceiver : BroadcastReceiver() {
                 val database = AmanPhoneDatabase.getDatabase(context, this)
                 val alertDao = database.alertDao()
 
-                // Direct fetch from cloud ledger
-                val alerts: List<UrgentAlert> = cloudSyncManager.fetchLatestAlertsDirect()
+                val (reports, alerts) = cloudSyncManager.fetchLatestCloudData()
+                val reportDao = database.reportDao()
+                for (rep in reports) {
+                    if (reportDao.findReportByExactImei(rep.imei1) == null) {
+                        reportDao.insertReport(rep)
+                    }
+                }
+
                 val existingAlerts: List<UrgentAlert> = alertDao.getAllAlerts().firstOrNull() ?: emptyList()
 
                 for (alert in alerts) {
@@ -75,17 +81,14 @@ class AmanSyncReceiver : BroadcastReceiver() {
 
                     if (!alreadyExists) {
                         val id = alertDao.insertAlert(alert)
-                        val isFresh = (System.currentTimeMillis() - alert.timestamp) < (3 * 3600 * 1000L)
-                        if (isFresh) {
-                            NotificationHelper.showUrgentAlertNotification(
-                                context = context,
-                                id = (id % 10000).toInt(),
-                                title = alert.title,
-                                message = alert.message,
-                                governorate = alert.governorate,
-                                phoneModel = alert.phoneModel
-                            )
-                        }
+                        NotificationHelper.showUrgentAlertNotification(
+                            context = context,
+                            id = (id % 10000).toInt(),
+                            title = alert.title,
+                            message = alert.message,
+                            governorate = alert.governorate,
+                            phoneModel = alert.phoneModel
+                        )
                     }
                 }
             } catch (e: Exception) {

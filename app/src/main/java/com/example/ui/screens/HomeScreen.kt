@@ -86,6 +86,8 @@ fun HomeScreen(
     val selectedStatus by viewModel.selectedStatus.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val lastSyncMessage by viewModel.lastSyncMessage.collectAsStateWithLifecycle()
 
     val topAlert = allAlerts.firstOrNull { it.severity == "CRITICAL" } ?: allAlerts.firstOrNull()
     var selectedIconConcept by remember { mutableStateOf(IconConcept.CYBER_GOLD_SHIELD) }
@@ -136,29 +138,43 @@ fun HomeScreen(
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Surface(
-                                        color = Color(0x3310B981),
+                                        color = if (isSyncing) Color(0x333B82F6) else Color(0x3310B981),
                                         shape = RoundedCornerShape(8.dp),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f))
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (isSyncing) Color(0xFF60A5FA) else Color(0xFF10B981).copy(alpha = 0.5f)
+                                        ),
+                                        modifier = Modifier.clickable { viewModel.syncNow() }
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(6.dp)
-                                                    .background(Color(0xFF34D399), CircleShape)
+                                                    .size(7.dp)
+                                                    .background(if (isSyncing) Color(0xFF60A5FA) else Color(0xFF34D399), CircleShape)
                                             )
                                             Spacer(modifier = Modifier.width(5.dp))
                                             Text(
-                                                text = "مزامنة سحابية نشطة",
-                                                color = Color(0xFFD1FAE5),
-                                                fontSize = 10.5.sp,
+                                                text = if (isSyncing) "جاري المزامنة..." else "مزامنة سحابية نشطة 🔄",
+                                                color = if (isSyncing) Color(0xFFBFDBFE) else Color(0xFFD1FAE5),
+                                                fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
                                 }
+                            }
+
+                            if (lastSyncMessage != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = lastSyncMessage ?: "",
+                                    color = Color(0xFF6EE7B7),
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
 
                             if (currentUser != null) {

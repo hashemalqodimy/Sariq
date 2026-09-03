@@ -116,6 +116,9 @@ class MainActivity : ComponentActivity() {
         // Create notification channel
         NotificationHelper.createNotificationChannel(applicationContext)
 
+        // Initialize Firebase Cloud Messaging (FCM) for instant push alerts
+        com.example.util.AmanFirebaseMessagingService.initializeFcm(applicationContext)
+
         // Request POST_NOTIFICATIONS permission on Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(

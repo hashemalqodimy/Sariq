@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.example.data.local.AlertDao
 import com.example.data.local.ImeiCheckDao
 import com.example.data.local.ReportDao
@@ -13,9 +14,12 @@ import com.example.util.CloudSyncManager
 import com.example.util.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 class PhoneReportRepository(
@@ -41,52 +45,68 @@ class PhoneReportRepository(
         com.example.util.AmanSyncReceiver.schedulePeriodicSync(context)
     }
 
-    private fun startCloudSynchronization() {
-        // Sync incoming cloud reports into local database so all devices have them
-        externalScope.launch {
-            try {
-                cloudSyncManager.observeCloudReports().collect { cloudReports ->
-                    for (cloudReport in cloudReports) {
-                        val localMatch = reportDao.findReportByExactImei(cloudReport.imei1)
-                        if (localMatch == null) {
-                            reportDao.insertReport(cloudReport)
-                        } else if (localMatch.status != cloudReport.status) {
-                            reportDao.updateStatus(localMatch.id, cloudReport.status)
-                        }
+    suspend fun syncNow(showNotificationForNewAlerts: Boolean = true): Int = withContext(Dispatchers.IO) {
+        var newItemsCount = 0
+        try {
+            val (cloudReports, cloudAlerts) = cloudSyncManager.fetchLatestCloudData()
+
+            for (cloudReport in cloudReports) {
+                val localMatch = reportDao.findReportByExactImei(cloudReport.imei1)
+                if (localMatch == null) {
+                    reportDao.insertReport(cloudReport)
+                    newItemsCount++
+                } else if (localMatch.status != cloudReport.status) {
+                    reportDao.updateStatus(localMatch.id, cloudReport.status)
+                }
+            }
+
+            val existingAlerts = alertDao.getAllAlerts().firstOrNull() ?: emptyList()
+            for (alert in cloudAlerts) {
+                val alreadyExists = existingAlerts.any { existing ->
+                    existing.phoneModel == alert.phoneModel &&
+                            existing.governorate == alert.governorate &&
+                            Math.abs(existing.timestamp - alert.timestamp) <= 120_000L
+                }
+                if (!alreadyExists) {
+                    val id = alertDao.insertAlert(alert)
+                    newItemsCount++
+                    if (showNotificationForNewAlerts) {
+                        NotificationHelper.showUrgentAlertNotification(
+                            context = context,
+                            id = (id % 10000).toInt(),
+                            title = alert.title,
+                            message = alert.message,
+                            governorate = alert.governorate,
+                            phoneModel = alert.phoneModel
+                        )
                     }
                 }
+            }
+        } catch (e: Exception) {
+            Log.w("PhoneReportRepository", "Sync error: ${e.message}")
+        }
+        newItemsCount
+    }
+
+    private fun startCloudSynchronization() {
+        // 1. Initial fast sync on launch (populate existing data without loud alerts)
+        externalScope.launch {
+            try {
+                syncNow(showNotificationForNewAlerts = false)
             } catch (_: Exception) {
             }
         }
 
-        // Sync incoming urgent alerts from other devices and trigger notifications
+        // 2. High-frequency live loop (every 4 seconds for instant multi-device sync)
         externalScope.launch {
-            try {
-                cloudSyncManager.observeCloudAlerts().collect { cloudAlerts ->
-                    for (alert in cloudAlerts) {
-                        val existingAlerts = alertDao.getAllAlerts().firstOrNull() ?: emptyList()
-                        val alreadyExists = existingAlerts.any {
-                            it.phoneModel == alert.phoneModel &&
-                                    it.governorate == alert.governorate &&
-                                    (it.timestamp - alert.timestamp).let { diff -> diff in -120000..120000 }
-                        }
-                        if (!alreadyExists) {
-                            val id = alertDao.insertAlert(alert)
-                            val isFresh = (System.currentTimeMillis() - alert.timestamp) < (3 * 3600 * 1000L)
-                            if (isFresh) {
-                                NotificationHelper.showUrgentAlertNotification(
-                                    context = context,
-                                    id = (id % 10000).toInt(),
-                                    title = alert.title,
-                                    message = alert.message,
-                                    governorate = alert.governorate,
-                                    phoneModel = alert.phoneModel
-                                )
-                            }
-                        }
-                    }
+            while (isActive) {
+                try {
+                    delay(4000)
+                    syncNow(showNotificationForNewAlerts = true)
+                } catch (e: Exception) {
+                    Log.w("PhoneReportRepository", "Sync loop error: ${e.message}")
+                    delay(5000)
                 }
-            } catch (_: Exception) {
             }
         }
     }
@@ -174,11 +194,12 @@ class PhoneReportRepository(
         )
         alertDao.insertAlert(alert)
 
-        // Push to cloud so ALL other users, stores, and police stations receive it instantly
-        externalScope.launch {
+        // Push to cloud immediately so ALL other users, stores, and police stations receive it instantly
+        withContext(Dispatchers.IO) {
             try {
-                cloudSyncManager.publishReportToCloud(report)
-            } catch (_: Exception) {
+                cloudSyncManager.publishReportToCloud(report.copy(id = reportId))
+            } catch (e: Exception) {
+                Log.w("PhoneReportRepository", "Error publishing to cloud: ${e.message}")
             }
         }
 

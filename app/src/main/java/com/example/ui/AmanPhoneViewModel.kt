@@ -37,6 +37,12 @@ class AmanPhoneViewModel(
     private val _isUserLoading = MutableStateFlow(true)
     val isUserLoading: StateFlow<Boolean> = _isUserLoading.asStateFlow()
 
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    private val _lastSyncMessage = MutableStateFlow<String?>(null)
+    val lastSyncMessage: StateFlow<String?> = _lastSyncMessage.asStateFlow()
+
     init {
         // Load last logged-in user if available
         viewModelScope.launch {
@@ -46,6 +52,26 @@ class AmanPhoneViewModel(
             } catch (_: Exception) {
             } finally {
                 _isUserLoading.value = false
+            }
+        }
+        syncNow()
+    }
+
+    fun syncNow(onFinished: ((Int) -> Unit)? = null) {
+        viewModelScope.launch {
+            _isSyncing.value = true
+            try {
+                val newCount = repository.syncNow(showNotificationForNewAlerts = true)
+                _lastSyncMessage.value = if (newCount > 0) {
+                    "تم استلام $newCount بلاغ وتعميم جديد بنجاح 🚨"
+                } else {
+                    "متصل بالبث السحابي المباشر - كافة البلاغات محدثة ✅"
+                }
+                onFinished?.invoke(newCount)
+            } catch (_: Exception) {
+                _lastSyncMessage.value = "تعذر الاتصال بالبث السحابي، تحقق من الإنترنت"
+            } finally {
+                _isSyncing.value = false
             }
         }
     }
