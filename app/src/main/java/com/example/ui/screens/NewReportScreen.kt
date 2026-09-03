@@ -551,5 +551,11 @@ fun NewReportScreen(
                 }
             }
         }
+
+        // Developer Credit Card
+        item {
+            com.example.ui.components.DeveloperCreditCard(compact = true)
+            Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 }

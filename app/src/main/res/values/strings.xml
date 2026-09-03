@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">أمان فون</string>
     <string name="app_tagline">المنصة اليمنية للبلاغات عن الجوالات المسروقة والمفقودة</string>
+    <string name="developer_credit">تم التطوير والإنشاء بواسطة هاشم القديمي</string>
+    <string name="developer_phone">714525890</string>
 </resources>

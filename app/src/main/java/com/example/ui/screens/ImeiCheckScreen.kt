@@ -460,6 +460,13 @@ fun ImeiCheckScreen(
                     }
                 }
             }
+
+            // Developer Credit Card
+            item {
+                Spacer(modifier = Modifier.height(6.dp))
+                com.example.ui.components.DeveloperCreditCard(compact = true)
+                Spacer(modifier = Modifier.height(12.dp))
+            }
         }
     }
 }

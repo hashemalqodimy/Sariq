@@ -77,12 +77,15 @@ import com.example.data.local.AmanPhoneDatabase
 import com.example.data.repository.PhoneReportRepository
 import com.example.ui.AmanPhoneViewModel
 import com.example.ui.AmanPhoneViewModelFactory
+import com.example.ui.components.AppInfoDialog
 import com.example.ui.components.ReportDetailDialog
 import com.example.ui.components.YemenFlagBadge
 import com.example.ui.screens.AlertsScreen
+import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.ImeiCheckScreen
 import com.example.ui.screens.NewReportScreen
+import com.example.ui.theme.AccentGold
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.PrimaryBlue
@@ -147,6 +150,22 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
+    var isAuthenticated by remember { mutableStateOf(false) }
+    var currentUserName by remember { mutableStateOf("هاشم القديمي") }
+    var currentUserEmail by remember { mutableStateOf("hashem@amanphone.ye") }
+    var showAppInfoDialog by remember { mutableStateOf(false) }
+
+    if (!isAuthenticated) {
+        AuthScreen(
+            onAuthSuccess = { name, email ->
+                currentUserName = name
+                currentUserEmail = email
+                isAuthenticated = true
+            }
+        )
+        return
+    }
+
     var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
     val unreadAlertsCount by viewModel.unreadAlertsCount.collectAsStateWithLifecycle()
     val selectedReport by viewModel.selectedReport.collectAsStateWithLifecycle()
@@ -189,19 +208,23 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
                     }
                 },
                 navigationIcon = {
-                    Box(
-                        modifier = Modifier
-                            .padding(start = 12.dp)
-                            .size(36.dp)
-                            .background(PrimaryBlue.copy(alpha = 0.12f), CircleShape),
-                        contentAlignment = Alignment.Center
+                    IconButton(
+                        onClick = { showAppInfoDialog = true },
+                        modifier = Modifier.testTag("top_bar_info_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = null,
-                            tint = PrimaryBlue,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(PrimaryBlue.copy(alpha = 0.12f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = "معلومات التطبيق والمطور",
+                                tint = PrimaryBlue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -358,6 +381,20 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
                 }
             },
             shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    // App & Developer Info Dialog
+    if (showAppInfoDialog) {
+        AppInfoDialog(
+            currentUser = currentUserName,
+            userEmail = currentUserEmail,
+            onLogout = {
+                isAuthenticated = false
+            },
+            onDismiss = {
+                showAppInfoDialog = false
+            }
         )
     }
 }

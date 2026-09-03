@@ -366,6 +366,13 @@ fun HomeScreen(
                     )
                 }
             }
+
+            // Developer Credit Card item inside the app feed
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                com.example.ui.components.DeveloperCreditCard()
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
 
         // Floating Action Button for New Report

@@ -282,6 +282,11 @@ fun AlertsScreen(
                 }
             }
         }
+
+        // Developer Credit Card
+        item {
+            com.example.ui.components.DeveloperCreditCard()
+        }
     }
 }
 
