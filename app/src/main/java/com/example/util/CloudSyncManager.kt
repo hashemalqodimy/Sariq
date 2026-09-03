@@ -213,6 +213,39 @@ class CloudSyncManager(private val context: Context) {
         val allReportsMap = LinkedHashMap<String, PhoneReport>() // key = imei1
         val allAlertsList = mutableListOf<UrgentAlert>()
 
+        // 0. Fetch from Firestore (Primary Enterprise Source)
+        firestore?.let { db ->
+            try {
+                // Fetch reports
+                val reportsSnapshot = db.collection("phone_reports")
+                    .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .limit(100)
+                    .get()
+                    .await()
+                
+                for (doc in reportsSnapshot.documents) {
+                    val report = parseFirestoreDoc(doc)
+                    if (report.imei1.isNotBlank()) {
+                        allReportsMap[report.imei1] = report
+                    }
+                }
+
+                // Fetch alerts
+                val alertsSnapshot = db.collection("urgent_alerts")
+                    .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .limit(50)
+                    .get()
+                    .await()
+                
+                for (doc in alertsSnapshot.documents) {
+                    val alert = parseFirestoreAlert(doc)
+                    allAlertsList.add(alert)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed reading from Firestore: ${e.message}")
+            }
+        }
+
         // 1. Fetch from ntfy.sh broadcast feed (includes all past broadcasts)
         try {
             val ntfyUrl = "$NTFY_BROADCAST_URL/json?poll=1&since=all"
@@ -404,6 +437,31 @@ class CloudSyncManager(private val context: Context) {
     }
 
     suspend fun updateReportStatusInCloud(imei: String, newStatus: String): Boolean = withContext(Dispatchers.IO) {
+        var success = false
+        val cleanImei = imei.trim().filter { it.isDigit() }
+        
+        // 1. Update in Firestore
+        firestore?.let { db ->
+            try {
+                val snapshot = db.collection("phone_reports")
+                    .whereEqualTo("imei1", cleanImei)
+                    .limit(1)
+                    .get()
+                    .await()
+                
+                if (!snapshot.isEmpty) {
+                    val docId = snapshot.documents.first().id
+                    db.collection("phone_reports").document(docId)
+                        .update("status", newStatus)
+                        .await()
+                    success = true
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed updating Firestore status: ${e.message}")
+            }
+        }
+
+        // 2. Update Central Hub Backup
         try {
             val (currentReports, currentAlerts) = fetchCloudDataFromHub()
             val updatedReports = currentReports.map { report ->
@@ -430,12 +488,16 @@ class CloudSyncManager(private val context: Context) {
                 .put(rootJson.toString().toRequestBody(JSON_MEDIA))
                 .build()
 
-            httpClient.newCall(request).execute().close()
-            true
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                success = true
+            }
+            response.close()
         } catch (e: Exception) {
-            Log.w(TAG, "Failed updating report status in cloud: ${e.message}")
-            false
+            Log.w(TAG, "Failed updating report status in Central Hub: ${e.message}")
         }
+        
+        success
     }
 
     private fun fetchCloudDataFromHub(): Pair<List<PhoneReport>, List<UrgentAlert>> {
@@ -588,33 +650,44 @@ class CloudSyncManager(private val context: Context) {
         }
     }
 
-    private fun parseFirestoreDoc(doc: DocumentSnapshot): PhoneReport? {
-        return try {
-            PhoneReport(
-                id = 0L,
-                brand = doc.getString("brand") ?: "جهاز",
-                modelName = doc.getString("modelName") ?: "",
-                imei1 = doc.getString("imei1") ?: "",
-                imei2 = doc.getString("imei2") ?: "",
-                serialNumber = doc.getString("serialNumber") ?: "",
-                color = doc.getString("color") ?: "",
-                storageCapacity = doc.getString("storageCapacity") ?: "",
-                governorate = doc.getString("governorate") ?: "",
-                district = doc.getString("district") ?: "",
-                incidentDate = doc.getString("incidentDate") ?: "",
-                description = doc.getString("description") ?: "",
-                distinctiveFeatures = doc.getString("distinctiveFeatures") ?: "",
-                ownerName = doc.getString("ownerName") ?: "",
-                contactPhone = doc.getString("contactPhone") ?: "",
-                whatsappNumber = doc.getString("whatsappNumber") ?: "",
-                policeStation = doc.getString("policeStation") ?: "",
-                rewardAmount = doc.getLong("rewardAmount") ?: 0L,
-                status = doc.getString("status") ?: "مسروق",
-                createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
-                isUrgent = doc.getBoolean("isUrgent") ?: true
-            )
-        } catch (_: Exception) {
-            null
-        }
+    private fun parseFirestoreDoc(doc: DocumentSnapshot): PhoneReport {
+        return PhoneReport(
+            id = 0L,
+            brand = doc.getString("brand") ?: "جهاز",
+            modelName = doc.getString("modelName") ?: "",
+            imei1 = doc.getString("imei1") ?: "",
+            imei2 = doc.getString("imei2") ?: "",
+            serialNumber = doc.getString("serialNumber") ?: "",
+            color = doc.getString("color") ?: "",
+            storageCapacity = doc.getString("storageCapacity") ?: "",
+            governorate = doc.getString("governorate") ?: "",
+            district = doc.getString("district") ?: "",
+            incidentDate = doc.getString("incidentDate") ?: "",
+            description = doc.getString("description") ?: "",
+            distinctiveFeatures = doc.getString("distinctiveFeatures") ?: "",
+            ownerName = doc.getString("ownerName") ?: "",
+            contactPhone = doc.getString("contactPhone") ?: "",
+            whatsappNumber = doc.getString("whatsappNumber") ?: "",
+            policeStation = doc.getString("policeStation") ?: "",
+            rewardAmount = doc.getLong("rewardAmount") ?: 0L,
+            status = doc.getString("status") ?: "مسروق",
+            createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
+            isUrgent = doc.getBoolean("isUrgent") ?: true
+        )
+    }
+
+    private fun parseFirestoreAlert(doc: DocumentSnapshot): UrgentAlert {
+        return UrgentAlert(
+            id = 0L,
+            reportId = 0L,
+            title = doc.getString("title") ?: "",
+            message = doc.getString("message") ?: "",
+            governorate = doc.getString("governorate") ?: "",
+            phoneModel = doc.getString("phoneModel") ?: "",
+            imeiSnippet = doc.getString("imeiSnippet") ?: "",
+            timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
+            isRead = false,
+            severity = doc.getString("severity") ?: "CRITICAL"
+        )
     }
 }

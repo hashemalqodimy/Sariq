@@ -50,15 +50,15 @@ fun GoogleAccountChooserDialog(
 ) {
     val suggestedAccounts = listOf(
         GoogleAccountItem(
-            name = "هاشم القديمي",
-            email = "hashem714pro@gmail.com",
-            initial = "هـ",
+            name = "مستخدم (حساب تجريبي)",
+            email = "user@example.com",
+            initial = "م",
             avatarColor = Color(0xFF1E88E5)
         ),
         GoogleAccountItem(
-            name = "هاشم القديمي (شخصي)",
-            email = "hashem.alqudaymi@gmail.com",
-            initial = "H",
+            name = "حساب جوجل (ثانوي)",
+            email = "demo@gmail.com",
+            initial = "D",
             avatarColor = Color(0xFF00897B)
         )
     )
