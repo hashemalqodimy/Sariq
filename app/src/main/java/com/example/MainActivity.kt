@@ -38,6 +38,7 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -85,6 +86,7 @@ import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.ImeiCheckScreen
 import com.example.ui.screens.NewReportScreen
+import com.example.ui.screens.WelcomeScreen
 import com.example.ui.theme.AccentGold
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.MyApplicationTheme
@@ -130,6 +132,7 @@ class MainActivity : ComponentActivity() {
             database.reportDao(),
             database.alertDao(),
             database.imeiCheckDao(),
+            database.userDao(),
             applicationContext
         )
 
@@ -150,21 +153,60 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
-    var isAuthenticated by remember { mutableStateOf(false) }
-    var currentUserName by remember { mutableStateOf("هاشم القديمي") }
-    var currentUserEmail by remember { mutableStateOf("hashem@amanphone.ye") }
+    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
+    val isUserLoading by viewModel.isUserLoading.collectAsStateWithLifecycle()
     var showAppInfoDialog by remember { mutableStateOf(false) }
 
-    if (!isAuthenticated) {
-        AuthScreen(
-            onAuthSuccess = { name, email ->
-                currentUserName = name
-                currentUserEmail = email
-                isAuthenticated = true
-            }
-        )
+    if (isUserLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF0F172A)),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = AccentGold)
+        }
         return
     }
+
+    var authSubScreen by remember { mutableStateOf<String>("WELCOME") } // "WELCOME" or "AUTH_FORM"
+
+    if (currentUser == null) {
+        if (authSubScreen == "WELCOME") {
+            WelcomeScreen(
+                onEmailSignInClick = {
+                    authSubScreen = "AUTH_FORM"
+                },
+                onGoogleSignInSuccess = { user ->
+                    viewModel.onUserLogin(user)
+                },
+                onGuestContinue = {
+                    viewModel.onUserLogin(
+                        com.example.data.model.AppUser(
+                            email = "guest@amanphone.ye",
+                            fullName = "زائر المنصة",
+                            authProvider = "GUEST"
+                        )
+                    )
+                }
+            )
+        } else {
+            AuthScreen(
+                onAuthSuccess = { user ->
+                    viewModel.onUserLogin(user)
+                },
+                onFindUser = { email ->
+                    viewModel.findUserByEmail(email)
+                },
+                onBack = {
+                    authSubScreen = "WELCOME"
+                }
+            )
+        }
+        return
+    }
+
+    val activeUser = currentUser!!
 
     var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
     val unreadAlertsCount by viewModel.unreadAlertsCount.collectAsStateWithLifecycle()
@@ -387,10 +429,11 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
     // App & Developer Info Dialog
     if (showAppInfoDialog) {
         AppInfoDialog(
-            currentUser = currentUserName,
-            userEmail = currentUserEmail,
+            currentUser = activeUser.fullName,
+            userEmail = activeUser.email,
+            authProvider = activeUser.authProvider,
             onLogout = {
-                isAuthenticated = false
+                viewModel.onUserLogout()
             },
             onDismiss = {
                 showAppInfoDialog = false

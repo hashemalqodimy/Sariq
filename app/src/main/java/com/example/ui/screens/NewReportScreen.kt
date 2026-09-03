@@ -91,9 +91,18 @@ fun NewReportScreen(
 
     val isSubmitting by viewModel.isSubmitting.collectAsStateWithLifecycle()
     val errorMessage by viewModel.formErrorMessage.collectAsStateWithLifecycle()
+    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
 
     var brandExpanded by remember { mutableStateOf(false) }
     var govExpanded by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(currentUser) {
+        currentUser?.let { user ->
+            if (formOwnerName.isBlank()) {
+                viewModel.formOwnerName.value = user.fullName
+            }
+        }
+    }
 
     LazyColumn(
         modifier = modifier

@@ -30,6 +30,47 @@ class AmanPhoneViewModel(
     private val repository: PhoneReportRepository
 ) : ViewModel() {
 
+    // Current User Session
+    private val _currentUser = MutableStateFlow<com.example.data.model.AppUser?>(null)
+    val currentUser: StateFlow<com.example.data.model.AppUser?> = _currentUser.asStateFlow()
+
+    private val _isUserLoading = MutableStateFlow(true)
+    val isUserLoading: StateFlow<Boolean> = _isUserLoading.asStateFlow()
+
+    init {
+        // Load last logged-in user if available
+        viewModelScope.launch {
+            try {
+                val lastUser = repository.getLastActiveUser()
+                _currentUser.value = lastUser
+            } catch (_: Exception) {
+            } finally {
+                _isUserLoading.value = false
+            }
+        }
+    }
+
+    fun onUserLogin(user: com.example.data.model.AppUser) {
+        viewModelScope.launch {
+            repository.saveUser(user.copy(lastLoginAt = System.currentTimeMillis()))
+            _currentUser.value = user
+        }
+    }
+
+    fun onUserLogout() {
+        val user = _currentUser.value
+        _currentUser.value = null
+        if (user != null) {
+            viewModelScope.launch {
+                repository.saveUser(user.copy(lastLoginAt = 0L))
+            }
+        }
+    }
+
+    suspend fun findUserByEmail(email: String): com.example.data.model.AppUser? {
+        return repository.getUserByEmail(email)
+    }
+
     // Filters
     val selectedGovernorate = MutableStateFlow("كافة المحافظات")
     val selectedStatus = MutableStateFlow("الكل")

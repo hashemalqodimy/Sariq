@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.data.model.AppUser
 import com.example.data.model.ImeiCheckRecord
 import com.example.data.model.PhoneReport
 import com.example.data.model.UrgentAlert
@@ -14,14 +15,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Database(
-    entities = [PhoneReport::class, UrgentAlert::class, ImeiCheckRecord::class],
-    version = 1,
+    entities = [PhoneReport::class, UrgentAlert::class, ImeiCheckRecord::class, AppUser::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AmanPhoneDatabase : RoomDatabase() {
     abstract fun reportDao(): ReportDao
     abstract fun alertDao(): AlertDao
     abstract fun imeiCheckDao(): ImeiCheckDao
+    abstract fun userDao(): UserDao
 
     companion object {
         @Volatile
@@ -34,6 +36,7 @@ abstract class AmanPhoneDatabase : RoomDatabase() {
                     AmanPhoneDatabase::class.java,
                     "aman_phone_yemen.db"
                 )
+                    .fallbackToDestructiveMigration(true)
                     .addCallback(DatabaseCallback(scope))
                     .build()
                 INSTANCE = instance

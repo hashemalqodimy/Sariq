@@ -4,6 +4,8 @@ import android.content.Context
 import com.example.data.local.AlertDao
 import com.example.data.local.ImeiCheckDao
 import com.example.data.local.ReportDao
+import com.example.data.local.UserDao
+import com.example.data.model.AppUser
 import com.example.data.model.ImeiCheckRecord
 import com.example.data.model.PhoneReport
 import com.example.data.model.UrgentAlert
@@ -15,6 +17,7 @@ class PhoneReportRepository(
     private val reportDao: ReportDao,
     private val alertDao: AlertDao,
     private val imeiCheckDao: ImeiCheckDao,
+    private val userDao: UserDao,
     private val context: Context
 ) {
     val allReports: Flow<List<PhoneReport>> = reportDao.getAllReports()
@@ -23,6 +26,19 @@ class PhoneReportRepository(
     val totalReportsCount: Flow<Int> = reportDao.getTotalReportsCount()
     val recoveredReportsCount: Flow<Int> = reportDao.getRecoveredReportsCount()
     val recentImeiChecks: Flow<List<ImeiCheckRecord>> = imeiCheckDao.getRecentChecks()
+
+    // Authentication & User profile methods
+    suspend fun getUserByEmail(email: String): AppUser? = userDao.getUserByEmail(email.trim().lowercase())
+
+    suspend fun getLastActiveUser(): AppUser? = userDao.getLastActiveUser()
+
+    suspend fun saveUser(user: AppUser) {
+        userDao.insertUser(user)
+    }
+
+    suspend fun updateUser(user: AppUser) {
+        userDao.updateUser(user)
+    }
 
     fun searchReports(query: String): Flow<List<PhoneReport>> {
         return reportDao.searchReports(query.trim())

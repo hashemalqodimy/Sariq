@@ -42,6 +42,7 @@ import com.example.ui.theme.PrimaryBlue
 fun AppInfoDialog(
     currentUser: String,
     userEmail: String,
+    authProvider: String = "EMAIL", // "GOOGLE" or "EMAIL"
     onLogout: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -91,7 +92,7 @@ fun AppInfoDialog(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(40.dp)
                                 .background(AccentGold, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
@@ -99,16 +100,32 @@ fun AppInfoDialog(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = null,
                                 tint = Navy900,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = currentUser,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = currentUser,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    color = if (authProvider == "GOOGLE") Color(0xFFE8F0FE) else Color(0xFFE2E8F0),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = if (authProvider == "GOOGLE") "Google" else "بريد موثق",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (authProvider == "GOOGLE") Color(0xFF1967D2) else Color(0xFF475569),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
                             Text(
                                 text = userEmail,
                                 fontSize = 11.sp,

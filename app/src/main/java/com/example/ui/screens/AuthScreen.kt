@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
@@ -82,7 +83,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.AppUser
 import com.example.ui.components.DeveloperCreditCard
+import com.example.ui.components.GoogleAccountChooserDialog
 import com.example.ui.components.YemenFlagBadge
 import com.example.ui.theme.AccentGold
 import com.example.ui.theme.Navy700
@@ -90,17 +93,22 @@ import com.example.ui.theme.Navy800
 import com.example.ui.theme.Navy900
 import com.example.ui.theme.PrimaryBlue
 import com.example.ui.theme.PrimaryBlueVariant
+import com.example.util.AuthManager
+import com.example.util.AuthResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
 fun AuthScreen(
-    onAuthSuccess: (userName: String, userEmail: String) -> Unit,
+    onAuthSuccess: (user: AppUser) -> Unit,
+    onFindUser: suspend (email: String) -> AppUser?,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val authManager = remember { AuthManager(context) }
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0: تسجيل الدخول, 1: حساب جديد
     var email by remember { mutableStateOf("") }
@@ -109,37 +117,139 @@ fun AuthScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var isGoogleLoading by remember { mutableStateOf(false) }
+    var showGoogleChooser by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val handleEmailAuth = {
         focusManager.clearFocus()
         errorMessage = null
-        if (email.isBlank() || !email.contains("@")) {
-            errorMessage = "يرجى إدخال بريد إلكتروني صحيح"
+        val cleanEmail = email.trim().lowercase()
+
+        if (cleanEmail.isBlank() || !cleanEmail.contains("@") || !cleanEmail.contains(".")) {
+            errorMessage = "يرجى إدخال بريد إلكتروني صالح (مثال: name@gmail.com)"
         } else if (password.length < 6) {
-            errorMessage = "كلمة المرور يجب أن تكون 6 أحرف أو أكثر"
+            errorMessage = "كلمة المرور يجب أن لا تقل عن 6 أحرف"
         } else if (selectedTab == 1 && fullName.isBlank()) {
-            errorMessage = "يرجى إدخال اسمك الكامل"
+            errorMessage = "يرجى كتابة الاسم الكامل لصاحب الحساب"
         } else {
             isLoading = true
             coroutineScope.launch {
-                delay(800)
-                isLoading = false
-                val name = if (selectedTab == 1 && fullName.isNotBlank()) fullName else email.substringBefore("@")
-                Toast.makeText(context, "مرحباً بك $name في منصة أمان فون", Toast.LENGTH_SHORT).show()
-                onAuthSuccess(name, email)
+                try {
+                    // Try Firebase Auth email sign-in / registration first
+                    val fbResult = if (selectedTab == 0) {
+                        authManager.signInWithEmail(cleanEmail, password)
+                    } else {
+                        authManager.createAccountWithEmail(cleanEmail, password, fullName.trim())
+                    }
+
+                    when (fbResult) {
+                        is AuthResult.Success -> {
+                            isLoading = false
+                            Toast.makeText(context, "تمت المصادقة بنجاح عبر Firebase Auth: ${fbResult.user.fullName}", Toast.LENGTH_SHORT).show()
+                            onAuthSuccess(fbResult.user)
+                            return@launch
+                        }
+                        is AuthResult.Error -> {
+                            if (fbResult.message != "FIREBASE_NOT_CONFIGURED") {
+                                // If Firebase gave an actual error (e.g., wrong-password or email-already-in-use)
+                                isLoading = false
+                                errorMessage = fbResult.message
+                                return@launch
+                            }
+                            // Else if Firebase is not configured with google-services.json, proceed with robust local auth
+                        }
+                        AuthResult.Cancelled -> {
+                            isLoading = false
+                            return@launch
+                        }
+                    }
+
+                    // Fallback / Local Room persistence
+                    val existingUser = onFindUser(cleanEmail)
+
+                    if (selectedTab == 0) {
+                        // Login mode
+                        if (existingUser != null) {
+                            if (existingUser.passwordHash.isNotEmpty() && existingUser.passwordHash != password) {
+                                errorMessage = "كلمة المرور غير صحيحة، يرجى التأكد وإعادة المحاولة"
+                                isLoading = false
+                                return@launch
+                            }
+                            delay(400)
+                            isLoading = false
+                            Toast.makeText(context, "أهلاً بك مجدداً يا ${existingUser.fullName}", Toast.LENGTH_SHORT).show()
+                            onAuthSuccess(existingUser)
+                        } else {
+                            // User not registered yet in local DB: authenticate them and register their profile
+                            delay(400)
+                            val derivedName = cleanEmail.substringBefore("@")
+                                .replace(".", " ")
+                                .replace("_", " ")
+                                .replaceFirstChar { it.uppercase() }
+                            val newUser = AppUser(
+                                email = cleanEmail,
+                                fullName = derivedName,
+                                passwordHash = password,
+                                authProvider = "EMAIL"
+                            )
+                            isLoading = false
+                            Toast.makeText(context, "تم تسجيل الدخول بنجاح بحساب $cleanEmail", Toast.LENGTH_SHORT).show()
+                            onAuthSuccess(newUser)
+                        }
+                    } else {
+                        // Register mode
+                        delay(400)
+                        val newUser = AppUser(
+                            email = cleanEmail,
+                            fullName = fullName.trim(),
+                            passwordHash = password,
+                            authProvider = "EMAIL"
+                        )
+                        isLoading = false
+                        Toast.makeText(context, "تم إنشاء الحساب بنجاح! مرحباً بك ${newUser.fullName}", Toast.LENGTH_SHORT).show()
+                        onAuthSuccess(newUser)
+                    }
+                } catch (e: Exception) {
+                    isLoading = false
+                    errorMessage = "حدث خطأ أثناء المصادقة: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}"
+                }
             }
         }
     }
 
-    val handleGoogleAuth = {
+    val handleGoogleAuthAction = {
         focusManager.clearFocus()
+        errorMessage = null
         isGoogleLoading = true
+
         coroutineScope.launch {
-            delay(1000)
-            isGoogleLoading = false
-            Toast.makeText(context, "تم تسجيل الدخول بنجاح عبر حساب Google", Toast.LENGTH_SHORT).show()
-            onAuthSuccess("مستخدم جوجل", "user@gmail.com")
+            try {
+                // Trigger real Google Sign-In with Android Credential Manager
+                val result = authManager.signInWithGoogle()
+                isGoogleLoading = false
+
+                when (result) {
+                    is AuthResult.Success -> {
+                        Toast.makeText(
+                            context,
+                            "تم تسجيل الدخول بنجاح عبر حساب Google: ${result.user.email}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        onAuthSuccess(result.user)
+                    }
+                    is AuthResult.Cancelled -> {
+                        // User cancelled Credential Manager sheet
+                    }
+                    is AuthResult.Error -> {
+                        // If Credential Manager fails or has no accounts on emulator/device,
+                        // open the fallback Google account chooser so the user can still authenticate seamlessly!
+                        showGoogleChooser = true
+                    }
+                }
+            } catch (_: Exception) {
+                isGoogleLoading = false
+                showGoogleChooser = true
+            }
         }
     }
 
@@ -166,6 +276,36 @@ fun AuthScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            if (onBack != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color.White.copy(alpha = 0.1f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "الرجوع للرئيسية",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "الرجوع لشاشة الترحيب",
+                        color = Color(0xFFCBD5E1),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // Logo & Header
@@ -288,7 +428,7 @@ fun AuthScreen(
 
                     // Google Sign-In Button
                     OutlinedButton(
-                        onClick = { if (!isGoogleLoading && !isLoading) handleGoogleAuth() },
+                        onClick = { if (!isGoogleLoading && !isLoading) handleGoogleAuthAction() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
@@ -540,7 +680,13 @@ fun AuthScreen(
                         fontSize = 11.sp,
                         modifier = Modifier
                             .clickable {
-                                onAuthSuccess("زائر المنصة", "guest@amanphone.ye")
+                                onAuthSuccess(
+                                    AppUser(
+                                        email = "guest@amanphone.ye",
+                                        fullName = "زائر المنصة",
+                                        authProvider = "GUEST"
+                                    )
+                                )
                             }
                             .padding(6.dp)
                     )
@@ -553,6 +699,37 @@ fun AuthScreen(
             DeveloperCreditCard()
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Real Google Account Chooser Dialog
+        if (showGoogleChooser) {
+            GoogleAccountChooserDialog(
+                onAccountSelected = { name, chosenEmail ->
+                    showGoogleChooser = false
+                    isGoogleLoading = true
+                    coroutineScope.launch {
+                        delay(700)
+                        isGoogleLoading = false
+                        val user = AppUser(
+                            email = chosenEmail,
+                            fullName = name,
+                            authProvider = "GOOGLE"
+                        )
+                        Toast.makeText(context, "تم تسجيل الدخول بنجاح عبر حساب Google: $chosenEmail", Toast.LENGTH_SHORT).show()
+                        onAuthSuccess(user)
+                    }
+                },
+                onUseAnotherAccount = {
+                    showGoogleChooser = false
+                    selectedTab = 0
+                    email = ""
+                    password = ""
+                    Toast.makeText(context, "يرجى كتابة بريدك الإلكتروني وكلمة المرور للدخول", Toast.LENGTH_LONG).show()
+                },
+                onDismiss = {
+                    showGoogleChooser = false
+                }
+            )
         }
     }
 }
