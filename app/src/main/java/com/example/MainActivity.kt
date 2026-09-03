@@ -1,6 +1,7 @@
 package com.example
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -118,6 +119,14 @@ class MainActivity : ComponentActivity() {
 
         // Initialize Firebase Cloud Messaging (FCM) for instant push alerts
         com.example.util.AmanFirebaseMessagingService.initializeFcm(applicationContext)
+
+        // Start Foreground Service for Instant P2P Sync
+        try {
+            val serviceIntent = Intent(applicationContext, com.example.util.AmanForegroundSyncService::class.java)
+            ContextCompat.startForegroundService(applicationContext, serviceIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         // Request POST_NOTIFICATIONS permission on Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
