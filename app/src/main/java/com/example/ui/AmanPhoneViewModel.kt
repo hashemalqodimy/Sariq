@@ -354,16 +354,20 @@ class AmanPhoneViewModel(
 
     fun deleteReportByAdmin(imei: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
-            val success = repository.cloudSyncManager.deleteReportInCloud(imei)
-            if (success) {
-                // Delete locally
-                val allLocals = allReports.value
-                val match = allLocals.firstOrNull { it.imei1 == imei || it.imei2 == imei }
-                match?.let { repository.deleteReportLocal(it) }
+            val cloudSuccess = repository.cloudSyncManager.deleteReportInCloud(imei)
+            
+            // Delete locally in all cases (so UI updates even if cloud fails)
+            val allLocals = allReports.value
+            val match = allLocals.firstOrNull { it.imei1 == imei || it.imei2 == imei }
+            if (match != null) {
+                repository.deleteReportLocal(match)
                 repository.syncNow(false)
                 onSuccess()
+            } else if (!cloudSuccess) {
+                onError("فشل في حذف البلاغ السحابي (أو غير موجود محلياً).")
             } else {
-                onError("فشل في حذف البلاغ السحابي.")
+                repository.syncNow(false)
+                onSuccess()
             }
         }
     }

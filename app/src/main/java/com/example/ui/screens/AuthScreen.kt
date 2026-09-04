@@ -239,7 +239,7 @@ fun AuthScreen(
                         // User cancelled Credential Manager sheet
                     }
                     is AuthResult.Error -> {
-                        Toast.makeText(context, "فشل تسجيل الدخول أو لم يتم العثور على حساب Google", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
