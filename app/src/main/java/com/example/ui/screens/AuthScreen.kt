@@ -85,7 +85,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AppUser
 import com.example.ui.components.DeveloperCreditCard
-import com.example.ui.components.GoogleAccountChooserDialog
 import com.example.ui.components.YemenFlagBadge
 import com.example.ui.theme.AccentGold
 import com.example.ui.theme.Navy700
@@ -117,7 +116,6 @@ fun AuthScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var isGoogleLoading by remember { mutableStateOf(false) }
-    var showGoogleChooser by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val handleEmailAuth = {
@@ -241,14 +239,12 @@ fun AuthScreen(
                         // User cancelled Credential Manager sheet
                     }
                     is AuthResult.Error -> {
-                        // If Credential Manager fails or has no accounts on emulator/device,
-                        // open the fallback Google account chooser so the user can still authenticate seamlessly!
-                        showGoogleChooser = true
+                        Toast.makeText(context, "فشل تسجيل الدخول أو لم يتم العثور على حساب Google", Toast.LENGTH_SHORT).show()
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 isGoogleLoading = false
-                showGoogleChooser = true
+                Toast.makeText(context, "فشل تسجيل الدخول: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -701,36 +697,6 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Real Google Account Chooser Dialog
-        if (showGoogleChooser) {
-            GoogleAccountChooserDialog(
-                onAccountSelected = { name, chosenEmail ->
-                    showGoogleChooser = false
-                    isGoogleLoading = true
-                    coroutineScope.launch {
-                        delay(700)
-                        isGoogleLoading = false
-                        val user = AppUser(
-                            email = chosenEmail,
-                            fullName = name,
-                            authProvider = "GOOGLE"
-                        )
-                        Toast.makeText(context, "تم تسجيل الدخول بنجاح عبر حساب Google: $chosenEmail", Toast.LENGTH_SHORT).show()
-                        onAuthSuccess(user)
-                    }
-                },
-                onUseAnotherAccount = {
-                    showGoogleChooser = false
-                    selectedTab = 0
-                    email = ""
-                    password = ""
-                    Toast.makeText(context, "يرجى كتابة بريدك الإلكتروني وكلمة المرور للدخول", Toast.LENGTH_LONG).show()
-                },
-                onDismiss = {
-                    showGoogleChooser = false
-                }
-            )
-        }
     }
 }
 

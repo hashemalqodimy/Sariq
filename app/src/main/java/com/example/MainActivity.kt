@@ -67,6 +67,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
@@ -99,7 +100,8 @@ enum class NavDestination(val title: String, val icon: ImageVector) {
     HOME("الرئيسية", Icons.Default.Home),
     IMEI_CHECK("فحص الـ IMEI", Icons.Default.Search),
     NEW_REPORT("إبلاغ جديد", Icons.Default.AddCircle),
-    ALERTS("التنبيهات", Icons.Default.Notifications)
+    ALERTS("التنبيهات", Icons.Default.Notifications),
+    ADMIN("لوحة المشرف", Icons.Default.Security)
 }
 
 class MainActivity : ComponentActivity() {
@@ -184,13 +186,19 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
     var authSubScreen by remember { mutableStateOf<String>("WELCOME") } // "WELCOME" or "AUTH_FORM"
 
     if (currentUser == null) {
+        val context = LocalContext.current
+        val onBannedCallback = {
+            android.widget.Toast.makeText(context, "عفواً، تم حظر حسابك من قبل الإدارة", android.widget.Toast.LENGTH_LONG).show()
+            viewModel.onUserLogout()
+        }
+        
         if (authSubScreen == "WELCOME") {
             WelcomeScreen(
                 onEmailSignInClick = {
                     authSubScreen = "AUTH_FORM"
                 },
                 onGoogleSignInSuccess = { user ->
-                    viewModel.onUserLogin(user)
+                    viewModel.onUserLogin(user, onBannedCallback)
                 },
                 onGuestContinue = {
                     viewModel.onUserLogin(
@@ -198,14 +206,15 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
                             email = "guest@amanphone.ye",
                             fullName = "زائر المنصة",
                             authProvider = "GUEST"
-                        )
+                        ),
+                        onBannedCallback
                     )
                 }
             )
         } else {
             AuthScreen(
                 onAuthSuccess = { user ->
-                    viewModel.onUserLogin(user)
+                    viewModel.onUserLogin(user, onBannedCallback)
                 },
                 onFindUser = { email ->
                     viewModel.findUserByEmail(email)
@@ -317,7 +326,13 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
                 tonalElevation = 6.dp,
                 modifier = Modifier.testTag("main_bottom_nav")
             ) {
-                NavDestination.values().forEach { destination ->
+                val destinations = if (activeUser.email.equals("hashem714pro@gmail.com", ignoreCase = true)) {
+                    NavDestination.values()
+                } else {
+                    NavDestination.values().filter { it != NavDestination.ADMIN }.toTypedArray()
+                }
+                
+                destinations.forEach { destination ->
                     val isSelected = currentDestination == destination
                     NavigationBarItem(
                         selected = isSelected,
@@ -383,6 +398,20 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
                 NavDestination.ALERTS -> AlertsScreen(
                     viewModel = viewModel
                 )
+                
+                NavDestination.ADMIN -> {
+                    if (activeUser.email.equals("hashem714pro@gmail.com", ignoreCase = true)) {
+                        com.example.ui.screens.AdminDashboardScreen(
+                            viewModel = viewModel,
+                            onNavigateToUserApp = {
+                                currentDestination = NavDestination.HOME
+                            }
+                        )
+                    } else {
+                        // Fallback just in case
+                        currentDestination = NavDestination.HOME
+                    }
+                }
             }
         }
     }

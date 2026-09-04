@@ -120,6 +120,10 @@ class PhoneReportRepository(
         userDao.insertUser(user)
     }
 
+    suspend fun deleteReportLocal(report: PhoneReport) {
+        reportDao.deleteReport(report)
+    }
+
     suspend fun updateUser(user: AppUser) {
         userDao.updateUser(user)
     }

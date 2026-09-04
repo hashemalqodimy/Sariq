@@ -12,6 +12,7 @@ data class AppUser(
     val authProvider: String = "EMAIL", // "EMAIL", "GOOGLE"
     val avatarUrl: String = "",
     val phone: String = "",
+    val isBanned: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val lastLoginAt: Long = System.currentTimeMillis()
 )

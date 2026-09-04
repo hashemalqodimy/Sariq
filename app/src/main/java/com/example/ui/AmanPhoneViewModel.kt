@@ -76,10 +76,19 @@ class AmanPhoneViewModel(
         }
     }
 
-    fun onUserLogin(user: com.example.data.model.AppUser) {
+    fun onUserLogin(user: com.example.data.model.AppUser, onBanned: (() -> Unit)? = null) {
         viewModelScope.launch {
-            repository.saveUser(user.copy(lastLoginAt = System.currentTimeMillis()))
-            _currentUser.value = user
+            // Check if user is banned
+            val isBanned = repository.cloudSyncManager.checkUserBannedStatus(user.email)
+            if (isBanned) {
+                onBanned?.invoke()
+                return@launch
+            }
+            
+            val updatedUser = user.copy(lastLoginAt = System.currentTimeMillis())
+            repository.saveUser(updatedUser)
+            repository.cloudSyncManager.syncUserToCloud(updatedUser)
+            _currentUser.value = updatedUser
         }
     }
 
@@ -103,6 +112,8 @@ class AmanPhoneViewModel(
     val searchQuery = MutableStateFlow("")
 
     // Reports Feed
+    val allReports: StateFlow<List<PhoneReport>> = repository.allReports.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val filteredReports: StateFlow<List<PhoneReport>> = combine(
         repository.allReports,
         selectedGovernorate,
@@ -315,6 +326,58 @@ class AmanPhoneViewModel(
 
     fun clearSuccessMessage() {
         _submissionSuccessMessage.value = null
+    }
+
+    // Admin Functions
+    private val _allUsers = MutableStateFlow<List<com.example.data.model.AppUser>>(emptyList())
+    val allAdminUsers: StateFlow<List<com.example.data.model.AppUser>> = _allUsers.asStateFlow()
+
+    fun fetchAdminUsers() {
+        viewModelScope.launch {
+            val users = repository.cloudSyncManager.fetchAllUsersFromCloud()
+            _allUsers.value = users
+        }
+    }
+
+    fun updateUserBanStatus(email: String, isBanned: Boolean, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.cloudSyncManager.updateUserBanStatusInCloud(email, isBanned)
+            if (success) {
+                // Update local admin list
+                _allUsers.value = _allUsers.value.map { 
+                    if (it.email == email) it.copy(isBanned = isBanned) else it 
+                }
+            }
+            onResult(success)
+        }
+    }
+
+    fun deleteReportByAdmin(imei: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.cloudSyncManager.deleteReportInCloud(imei)
+            if (success) {
+                // Delete locally
+                val allLocals = allReports.value
+                val match = allLocals.firstOrNull { it.imei1 == imei || it.imei2 == imei }
+                match?.let { repository.deleteReportLocal(it) }
+                repository.syncNow(false)
+                onSuccess()
+            } else {
+                onError("فشل في حذف البلاغ السحابي.")
+            }
+        }
+    }
+
+    fun publishAdminAlert(title: String, message: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.cloudSyncManager.publishUrgentAlert(title, message)
+            if (success) {
+                repository.syncNow(true)
+                onSuccess()
+            } else {
+                onError("فشل في نشر التعميم السحابي.")
+            }
+        }
     }
 
     fun clearErrorMessage() {

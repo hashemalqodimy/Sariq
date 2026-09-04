@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.example.data.model.PhoneReport
 import com.example.data.model.UrgentAlert
+import com.example.data.model.AppUser
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
@@ -436,6 +437,65 @@ class CloudSyncManager(private val context: Context) {
         null
     }
 
+    suspend fun deleteReportInCloud(imei: String): Boolean = withContext(Dispatchers.IO) {
+        var success = false
+        val cleanImei = imei.trim().filter { it.isDigit() }
+        
+        firestore?.let { db ->
+            try {
+                val snapshot = db.collection("phone_reports")
+                    .whereEqualTo("imei1", cleanImei)
+                    .limit(1)
+                    .get()
+                    .await()
+                
+                if (!snapshot.isEmpty) {
+                    val docId = snapshot.documents.first().id
+                    db.collection("phone_reports").document(docId).delete().await()
+                    success = true
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed deleting from Firestore: ${e.message}")
+            }
+        }
+        success
+    }
+
+    suspend fun publishUrgentAlert(title: String, message: String, severity: String = "CRITICAL"): Boolean = withContext(Dispatchers.IO) {
+        var success = false
+        val newAlert = hashMapOf(
+            "title" to title,
+            "message" to message,
+            "severity" to severity,
+            "timestamp" to System.currentTimeMillis()
+        )
+        
+        firestore?.let { db ->
+            try {
+                db.collection("urgent_alerts").add(newAlert).await()
+                success = true
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed publishing alert to Firestore: ${e.message}")
+            }
+        }
+        
+        // Also push to ntfy.sh for immediate broadcast to devices relying on SSE
+        if (success) {
+            try {
+                val request = Request.Builder()
+                    .url(NTFY_BROADCAST_URL)
+                    .post(message.toRequestBody("text/plain".toMediaType()))
+                    .addHeader("Title", title)
+                    .addHeader("Priority", if (severity == "CRITICAL") "5" else "default")
+                    .addHeader("Tags", "warning,police")
+                    .build()
+                httpClient.newCall(request).execute().close()
+            } catch (_: Exception) {}
+        }
+        
+        success
+    }
+
     suspend fun updateReportStatusInCloud(imei: String, newStatus: String): Boolean = withContext(Dispatchers.IO) {
         var success = false
         val cleanImei = imei.trim().filter { it.isDigit() }
@@ -689,5 +749,74 @@ class CloudSyncManager(private val context: Context) {
             isRead = false,
             severity = doc.getString("severity") ?: "CRITICAL"
         )
+    }
+    
+    // User Management API (Admin/Cloud)
+    suspend fun syncUserToCloud(user: AppUser) = withContext(Dispatchers.IO) {
+        firestore?.let { db ->
+            try {
+                val userMap = hashMapOf(
+                    "email" to user.email,
+                    "fullName" to user.fullName,
+                    "authProvider" to user.authProvider,
+                    "isBanned" to user.isBanned,
+                    "createdAt" to user.createdAt,
+                    "lastLoginAt" to user.lastLoginAt
+                )
+                db.collection("users").document(user.email).set(userMap).await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed syncing user to Firestore: ${e.message}")
+            }
+        }
+    }
+    
+    suspend fun fetchAllUsersFromCloud(): List<AppUser> = withContext(Dispatchers.IO) {
+        val users = mutableListOf<AppUser>()
+        firestore?.let { db ->
+            try {
+                val snapshot = db.collection("users").get().await()
+                for (doc in snapshot.documents) {
+                    users.add(
+                        AppUser(
+                            email = doc.getString("email") ?: doc.id,
+                            fullName = doc.getString("fullName") ?: "غير معروف",
+                            authProvider = doc.getString("authProvider") ?: "UNKNOWN",
+                            isBanned = doc.getBoolean("isBanned") ?: false,
+                            createdAt = doc.getLong("createdAt") ?: 0L,
+                            lastLoginAt = doc.getLong("lastLoginAt") ?: 0L
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed fetching users from Firestore: ${e.message}")
+            }
+        }
+        users
+    }
+    
+    suspend fun updateUserBanStatusInCloud(email: String, isBanned: Boolean): Boolean = withContext(Dispatchers.IO) {
+        var success = false
+        firestore?.let { db ->
+            try {
+                db.collection("users").document(email).update("isBanned", isBanned).await()
+                success = true
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed updating user ban status: ${e.message}")
+            }
+        }
+        success
+    }
+    
+    suspend fun checkUserBannedStatus(email: String): Boolean = withContext(Dispatchers.IO) {
+        var isBanned = false
+        firestore?.let { db ->
+            try {
+                val doc = db.collection("users").document(email).get().await()
+                isBanned = doc.getBoolean("isBanned") ?: false
+            } catch (e: Exception) {
+                // Ignore if not found
+            }
+        }
+        isBanned
     }
 }
