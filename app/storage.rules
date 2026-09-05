@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == "hashem714pro@gmail.com";
+    }
+
+    // Proofs folder (receipts, boxes)
+    match /proofs/{imageId} {
+      // Anyone can view the proof images if they have the link
+      allow read: if true;
+      
+      // Only authenticated users can upload
+      // Must be an image file and less than 5 MB
+      allow create: if isAuthenticated() 
+                    && request.resource.contentType.matches('image/.*')
+                    && request.resource.size < 5 * 1024 * 1024;
+                    
+      allow update, delete: if isAdmin() || isAuthenticated(); // Simplified for now
+    }
+  }
+}

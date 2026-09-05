@@ -1,0 +1,59 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == "hashem714pro@gmail.com";
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Reports Collection
+    match /phone_reports/{reportId} {
+      // Anyone can read reports
+      allow read: if true;
+      
+      // Creating a report
+      allow create: if isAuthenticated() 
+                    && request.resource.data.imei1 is string 
+                    && request.resource.data.imei1.size() == 15 
+                    && request.resource.data.modelName is string
+                    && request.resource.data.district is string;
+
+      // Updating a report (only owner or admin)
+      allow update: if isAdmin() || (isAuthenticated() && request.auth.token.email == resource.data.userEmail);
+      
+      // Deleting a report (only owner or admin)
+      allow delete: if isAdmin() || (isAuthenticated() && request.auth.token.email == resource.data.userEmail);
+    }
+
+    // Urgent Alerts Collection
+    match /urgent_alerts/{alertId} {
+      // Anyone can read alerts
+      allow read: if true;
+      
+      // Only Admin can create, update, or delete alerts
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      // Users can read their own data, Admin can read all
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Users can update their own data, Admin can update all (e.g. banning)
+      allow create, update: if isOwner(userId) || isAdmin();
+      
+      // Only Admin can delete users
+      allow delete: if isAdmin();
+    }
+  }
+}

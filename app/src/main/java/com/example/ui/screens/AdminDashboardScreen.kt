@@ -106,7 +106,7 @@ fun AdminDashboardScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(reports, key = { it.imei1 }) { report ->
+                    items(reports, key = { it.id }) { report ->
                         AdminReportCard(
                             report = report,
                             onDelete = {
@@ -128,7 +128,7 @@ fun AdminDashboardScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(users, key = { it.email }) { user ->
+                    items(users) { user ->
                         AdminUserCard(
                             user = user,
                             onToggleBan = { isBanned ->

@@ -260,8 +260,8 @@ class AmanPhoneViewModel(
             _formErrorMessage.value = "يرجى كتابة موديل الهاتف (مثال: Galaxy S23 أو iPhone 14)"
             return
         }
-        if (imei1.length < 14) {
-            _formErrorMessage.value = "رقم الـ IMEI غير صالح! يجب أن يتكون من 15 رقماً"
+        if (!com.example.util.ImeiValidator.isValidImei(imei1)) {
+            _formErrorMessage.value = "رقم الـ IMEI غير صالح أو أرقام عشوائية! يرجى إدخال 15 رقماً حقيقياً (خوارزمية Luhn)."
             return
         }
         if (district.isBlank()) {
@@ -281,6 +281,14 @@ class AmanPhoneViewModel(
         _isSubmitting.value = true
 
         viewModelScope.launch {
+            // Check if IMEI already exists
+            val existing = repository.cloudSyncManager.searchImeiInCloud(imei1)
+            if (existing != null && existing.status != "تم الاسترجاع" && existing.status != "مغلق") {
+                _formErrorMessage.value = "هذا الـ IMEI مسجل مسبقاً في بلاغ نشط! يرجى التحقق."
+                _isSubmitting.value = false
+                return@launch
+            }
+
             val reward = formRewardAmount.value.filter { it.isDigit() }.toLongOrNull() ?: 0L
             val report = PhoneReport(
                 brand = brand,

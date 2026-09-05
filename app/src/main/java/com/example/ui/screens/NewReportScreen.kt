@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -95,6 +96,22 @@ fun NewReportScreen(
 
     var brandExpanded by remember { mutableStateOf(false) }
     var govExpanded by remember { mutableStateOf(false) }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
+
+    if (showBarcodeScanner) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showBarcodeScanner = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            com.example.ui.screens.BarcodeScannerScreen(
+                onBarcodeScanned = { barcode ->
+                    viewModel.formImei1.value = barcode
+                    showBarcodeScanner = false
+                },
+                onDismiss = { showBarcodeScanner = false }
+            )
+        }
+    }
 
     androidx.compose.runtime.LaunchedEffect(currentUser) {
         currentUser?.let { user ->
@@ -284,6 +301,15 @@ fun NewReportScreen(
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true,
                         supportingText = { Text("${formImei1.length} / 15 خانة") },
+                        trailingIcon = {
+                            androidx.compose.material3.IconButton(onClick = { showBarcodeScanner = true }) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Default.CameraAlt,
+                                    contentDescription = "مسح الباركود",
+                                    tint = PrimaryBlue
+                                )
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("form_imei1_input")
