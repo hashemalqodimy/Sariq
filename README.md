@@ -14,6 +14,24 @@
 
 ---
 
+### 🛠️ البناء محلياً
+```bash
+# يتطلب JDK 17 و Android SDK (compileSdk 36) و Gradle 9.3+
+touch .env                      # مفاتيح اختيارية (انظر .env.example)
+gradle testDebugUnitTest        # اختبارات الوحدة
+gradle assembleDebug            # ينتج app/build/outputs/apk/debug/app-debug.apk
+```
+- يتم توليد `debug.keystore` تلقائياً عند أول بناء (الملف مُتجاهَل في Git).
+- لتفعيل Firebase (المصادقة، Firestore، FCM) ضع `google-services.json` داخل مجلد `app/` — الملف مُتجاهَل في Git ولا يجب رفعه.
+- لتوقيع نسخة الإصدار عرّف متغيرات البيئة `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
+
+### 🔐 ملاحظات أمنية
+- صلاحيات المشرف تُمنح فقط لحساب مُوثّق عبر Google / Firebase Auth، ولا يمكن الحصول عليها بحساب محلي دون اتصال.
+- كلمات مرور الحسابات المحلية (وضع عدم الاتصال) تُخزَّن كتجزئة PBKDF2 مملّحة ولا تُحفظ نصاً صريحاً.
+- النسخ الاحتياطي التلقائي لقاعدة البيانات معطّل (`allowBackup=false`).
+
+---
+
 ### 📥 الحصول على ملف الـ APK
 عند رفع هذا المشروع إلى **GitHub**:
 1. يتولى نظام **GitHub Actions** المدمج بناء ملف الـ APK تلقائياً.

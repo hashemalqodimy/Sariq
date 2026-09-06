@@ -65,6 +65,14 @@ class CloudSyncManager(private val context: Context) {
     val isCloudConnected: Boolean
         get() = true
 
+    private fun currentUserEmail(): String? = try {
+        if (FirebaseApp.getApps(context).isNotEmpty()) {
+            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email?.lowercase()
+        } else null
+    } catch (_: Exception) {
+        null
+    }
+
     /**
      * Publishes a phone report and urgent broadcast to ALL devices across Yemen.
      * Guaranteed delivery across ntfy.sh pub/sub, central hub, and Firestore.
@@ -179,7 +187,9 @@ class CloudSyncManager(private val context: Context) {
                     "rewardAmount" to report.rewardAmount,
                     "status" to report.status,
                     "createdAt" to report.createdAt,
-                    "isUrgent" to report.isUrgent
+                    "isUrgent" to report.isUrgent,
+                    // Required by firestore.rules so the reporter can later update/delete their own report
+                    "userEmail" to (currentUserEmail() ?: "")
                 )
                 db.collection("phone_reports").add(reportMap).await()
 
@@ -525,7 +535,7 @@ class CloudSyncManager(private val context: Context) {
         try {
             val (currentReports, currentAlerts) = fetchCloudDataFromHub()
             val updatedReports = currentReports.map { report ->
-                if (report.imei1 == imei || report.imei2 == imei) {
+                if (report.imei1 == cleanImei || report.imei2 == cleanImei) {
                     report.copy(status = newStatus)
                 } else {
                     report

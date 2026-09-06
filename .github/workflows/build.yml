@@ -3,6 +3,7 @@ name: Build Android APK
 on:
   push:
     branches: [ main, master ]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -21,33 +22,44 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Prepare Environment and Keystore
-        run: |
-          touch .env
-          if [ -f debug.keystore.base64 ]; then
-            base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
-          fi
-          if [ ! -s debug.keystore ]; then
-            echo "Generating debug.keystore..."
-            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          fi
+      # Pins the Gradle version to the one declared in gradle/wrapper/gradle-wrapper.properties
+      # (AGP 9.x requires Gradle 9.x; the runner's preinstalled Gradle is not guaranteed to match).
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Prepare Environment
+        run: touch .env
+        # debug.keystore is generated automatically by app/build.gradle.kts when missing.
+
+      - name: Run Unit Tests
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace --no-daemon --no-configuration-cache
+        run: gradle assembleDebug --stacktrace --no-daemon
 
       - name: Prepare APK File
-        run: |
-          cp app/build/outputs/apk/debug/*.apk app/build/outputs/apk/debug/aman-phone.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk aman-phone.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: aman-phone-debug-apk
-          path: app/build/outputs/apk/debug/aman-phone.apk
+          path: aman-phone.apk
+
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
 
       - name: Release APK on GitHub
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
@@ -56,6 +68,6 @@ jobs:
           body: |
             ### 📱 تطبيق أمان فون (Aman Phone) - النسخة الجاهزة للتثبيت
             قم بتنزيل ملف **`aman-phone.apk`** المرفق بالأسفل وتثبيته مباشرة على هاتفك.
-          files: app/build/outputs/apk/debug/aman-phone.apk
+          files: aman-phone.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

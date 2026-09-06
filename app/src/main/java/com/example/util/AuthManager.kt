@@ -44,11 +44,12 @@ class AuthManager(private val context: Context) {
     }
 
     private fun getWebClientId(): String {
-        return try {
-            context.getString(R.string.default_web_client_id)
-        } catch (_: Exception) {
-            "569517041223-example.apps.googleusercontent.com"
+        // Prefer the ID generated from google-services.json; fall back to the bundled one.
+        val generatedId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        if (generatedId != 0) {
+            context.getString(generatedId).takeIf { it.isNotBlank() }?.let { return it }
         }
+        return context.getString(R.string.fallback_web_client_id)
     }
 
     /**
@@ -163,7 +164,7 @@ class AuthManager(private val context: Context) {
                 val user = AppUser(
                     email = fbUser?.email ?: email,
                     fullName = displayName,
-                    authProvider = "EMAIL",
+                    authProvider = "FIREBASE_EMAIL",
                     lastLoginAt = System.currentTimeMillis()
                 )
                 return AuthResult.Success(user)
@@ -195,8 +196,8 @@ class AuthManager(private val context: Context) {
                 val user = AppUser(
                     email = fbUser?.email ?: email,
                     fullName = fullName,
-                    passwordHash = password,
-                    authProvider = "EMAIL",
+                    passwordHash = "", // Credentials are managed by Firebase Auth; never store them locally
+                    authProvider = "FIREBASE_EMAIL",
                     lastLoginAt = System.currentTimeMillis()
                 )
                 return AuthResult.Success(user)

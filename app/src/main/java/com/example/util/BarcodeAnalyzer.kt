@@ -26,11 +26,24 @@ class BarcodeAnalyzer(
         .build()
 
     private val scanner = BarcodeScanning.getClient(options)
+    @Volatile
     private var isScanning = true
+    @Volatile
+    private var isClosed = false
+
+    /** Releases the ML Kit detector. Must be called when the analyzer is no longer used. */
+    fun close() {
+        isClosed = true
+        isScanning = false
+        try {
+            scanner.close()
+        } catch (_: Exception) {
+        }
+    }
 
     @SuppressLint("UnsafeOptInUsageError")
     override fun analyze(imageProxy: ImageProxy) {
-        if (!isScanning) {
+        if (!isScanning || isClosed) {
             imageProxy.close()
             return
         }

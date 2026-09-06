@@ -3,6 +3,7 @@ package com.example.data.repository
 import android.content.Context
 import android.util.Log
 import com.example.data.local.AlertDao
+import com.example.data.local.AmanPhoneDatabase
 import com.example.data.local.ImeiCheckDao
 import com.example.data.local.ReportDao
 import com.example.data.local.UserDao
@@ -11,8 +12,12 @@ import com.example.data.model.ImeiCheckRecord
 import com.example.data.model.PhoneReport
 import com.example.data.model.UrgentAlert
 import com.example.util.CloudSyncManager
+import com.example.util.DeletedReportsStore
 import com.example.util.NotificationHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -28,9 +33,11 @@ class PhoneReportRepository(
     private val imeiCheckDao: ImeiCheckDao,
     private val userDao: UserDao,
     private val context: Context,
-    private val externalScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    private val externalScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 ) {
     val cloudSyncManager = CloudSyncManager(context)
+
+    private var syncJob: Job? = null
 
     val allReports: Flow<List<PhoneReport>> = reportDao.getAllReports()
     val allAlerts: Flow<List<UrgentAlert>> = alertDao.getAllAlerts()
@@ -39,10 +46,43 @@ class PhoneReportRepository(
     val recoveredReportsCount: Flow<Int> = reportDao.getRecoveredReportsCount()
     val recentImeiChecks: Flow<List<ImeiCheckRecord>> = imeiCheckDao.getRecentChecks()
 
+    companion object {
+        private const val TAG = "PhoneReportRepository"
+
+        /** Interval of the in-app polling loop. Instant delivery is handled by FCM / the ntfy stream. */
+        private const val LIVE_SYNC_INTERVAL_MS = 60_000L
+        private const val RETRY_DELAY_MS = 30_000L
+
+        @Volatile
+        private var INSTANCE: PhoneReportRepository? = null
+
+        /**
+         * Process-wide singleton. Prevents a fresh sync loop from being spawned on every
+         * Activity re-creation (e.g. rotation), which previously leaked coroutines.
+         */
+        fun getInstance(context: Context): PhoneReportRepository {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: run {
+                    val appContext = context.applicationContext
+                    val db = AmanPhoneDatabase.getDatabase(appContext, CoroutineScope(SupervisorJob() + Dispatchers.IO))
+                    PhoneReportRepository(
+                        db.reportDao(), db.alertDao(), db.imeiCheckDao(), db.userDao(), appContext
+                    ).also { INSTANCE = it }
+                }
+            }
+        }
+    }
+
     init {
-        // Start real-time cloud observation and auto-sync
+        // Start cloud observation and auto-sync
         startCloudSynchronization()
         com.example.util.AmanSyncReceiver.schedulePeriodicSync(context)
+    }
+
+    /** Stops the background polling loop (used from tests / app shutdown). */
+    fun stopCloudSynchronization() {
+        syncJob?.cancel()
+        syncJob = null
     }
 
     suspend fun syncNow(showNotificationForNewAlerts: Boolean = true): Int = withContext(Dispatchers.IO) {
@@ -50,7 +90,9 @@ class PhoneReportRepository(
         try {
             val (cloudReports, cloudAlerts) = cloudSyncManager.fetchLatestCloudData()
 
+            val deletedImeis = DeletedReportsStore.getDeletedImeis(context)
             for (cloudReport in cloudReports) {
+                if (cloudReport.imei1 in deletedImeis) continue // admin-deleted, do not resurrect
                 val localMatch = reportDao.findReportByExactImei(cloudReport.imei1)
                 if (localMatch == null) {
                     reportDao.insertReport(cloudReport)
@@ -83,29 +125,31 @@ class PhoneReportRepository(
                 }
             }
         } catch (e: Exception) {
-            Log.w("PhoneReportRepository", "Sync error: ${e.message}")
+            Log.w(TAG, "Sync error: ${e.message}")
         }
         newItemsCount
     }
 
     private fun startCloudSynchronization() {
-        // 1. Initial fast sync on launch (populate existing data without loud alerts)
-        externalScope.launch {
+        if (syncJob?.isActive == true) return
+        syncJob = externalScope.launch {
+            // 1. Initial sync on launch (populate existing data without loud alerts)
             try {
                 syncNow(showNotificationForNewAlerts = false)
             } catch (_: Exception) {
             }
-        }
 
-        // 2. High-frequency live loop (every 4 seconds for instant multi-device sync)
-        externalScope.launch {
+            // 2. Periodic reconciliation loop. Real-time pushes arrive via FCM and the
+            //    foreground ntfy stream, so polling only needs to catch missed events.
             while (isActive) {
                 try {
-                    delay(4000)
+                    delay(LIVE_SYNC_INTERVAL_MS)
                     syncNow(showNotificationForNewAlerts = true)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    Log.w("PhoneReportRepository", "Sync loop error: ${e.message}")
-                    delay(5000)
+                    Log.w(TAG, "Sync loop error: ${e.message}")
+                    delay(RETRY_DELAY_MS)
                 }
             }
         }
@@ -122,6 +166,7 @@ class PhoneReportRepository(
 
     suspend fun deleteReportLocal(report: PhoneReport) {
         reportDao.deleteReport(report)
+        DeletedReportsStore.markDeleted(context, report.imei1)
     }
 
     suspend fun updateUser(user: AppUser) {
@@ -203,7 +248,7 @@ class PhoneReportRepository(
             try {
                 cloudSyncManager.publishReportToCloud(report.copy(id = reportId))
             } catch (e: Exception) {
-                Log.w("PhoneReportRepository", "Error publishing to cloud: ${e.message}")
+                Log.w(TAG, "Error publishing to cloud: ${e.message}")
             }
         }
 
@@ -266,6 +311,6 @@ class PhoneReportRepository(
     }
 
     suspend fun deleteReport(report: PhoneReport) {
-        reportDao.deleteReport(report)
+        deleteReportLocal(report)
     }
 }

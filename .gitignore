@@ -16,3 +16,12 @@
 local.properties
 .env
 debug.keystore
+
+# Signing keys & secrets - never commit
+*.jks
+*.keystore
+google-services.json
+
+# Built binaries belong in GitHub Releases, not in the repo
+*.apk
+*.aab

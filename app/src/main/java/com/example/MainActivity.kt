@@ -75,8 +75,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
-import com.example.data.local.AmanPhoneDatabase
 import com.example.data.repository.PhoneReportRepository
 import com.example.ui.AmanPhoneViewModel
 import com.example.ui.AmanPhoneViewModelFactory
@@ -106,6 +104,25 @@ enum class NavDestination(val title: String, val icon: ImageVector) {
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        const val EXTRA_OPEN_SCREEN = "OPEN_SCREEN"
+    }
+
+    /** Screen requested by a notification tap (consumed by the Compose tree). */
+    private val requestedScreen = mutableStateOf<NavDestination?>(null)
+
+    private fun consumeNavigationIntent(intent: Intent?) {
+        val target = intent?.getStringExtra(EXTRA_OPEN_SCREEN) ?: return
+        requestedScreen.value = NavDestination.entries.firstOrNull { it.name == target }
+        intent.removeExtra(EXTRA_OPEN_SCREEN)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeNavigationIntent(intent)
+    }
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { _ ->
@@ -115,6 +132,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        consumeNavigationIntent(intent)
 
         // Create notification channel
         NotificationHelper.createNotificationChannel(applicationContext)
@@ -141,14 +159,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val database = AmanPhoneDatabase.getDatabase(applicationContext, lifecycleScope)
-        val repository = PhoneReportRepository(
-            database.reportDao(),
-            database.alertDao(),
-            database.imeiCheckDao(),
-            database.userDao(),
-            applicationContext
-        )
+        val repository = PhoneReportRepository.getInstance(applicationContext)
 
         val viewModel: AmanPhoneViewModel by viewModels {
             AmanPhoneViewModelFactory(repository)
@@ -157,7 +168,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    AmanPhoneMainApp(viewModel = viewModel)
+                    AmanPhoneMainApp(
+                        viewModel = viewModel,
+                        requestedScreen = requestedScreen.value,
+                        onRequestedScreenConsumed = { requestedScreen.value = null }
+                    )
                 }
             }
         }
@@ -166,7 +181,11 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
+fun AmanPhoneMainApp(
+    viewModel: AmanPhoneViewModel,
+    requestedScreen: NavDestination? = null,
+    onRequestedScreenConsumed: () -> Unit = {}
+) {
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isUserLoading by viewModel.isUserLoading.collectAsStateWithLifecycle()
     var showAppInfoDialog by remember { mutableStateOf(false) }
@@ -230,6 +249,16 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
     val activeUser = currentUser!!
 
     var currentDestination by remember { mutableStateOf(NavDestination.HOME) }
+
+    // Navigate when the user taps an urgent-alert notification
+    LaunchedEffect(requestedScreen) {
+        requestedScreen?.let {
+            if (it != NavDestination.ADMIN || com.example.util.AdminPolicy.isAdmin(activeUser)) {
+                currentDestination = it
+            }
+            onRequestedScreenConsumed()
+        }
+    }
     val unreadAlertsCount by viewModel.unreadAlertsCount.collectAsStateWithLifecycle()
     val selectedReport by viewModel.selectedReport.collectAsStateWithLifecycle()
     val successMessage by viewModel.submissionSuccessMessage.collectAsStateWithLifecycle()
@@ -326,7 +355,7 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
                 tonalElevation = 6.dp,
                 modifier = Modifier.testTag("main_bottom_nav")
             ) {
-                val destinations = if (activeUser.email.equals("hashem714pro@gmail.com", ignoreCase = true)) {
+                val destinations = if (com.example.util.AdminPolicy.isAdmin(activeUser)) {
                     NavDestination.values()
                 } else {
                     NavDestination.values().filter { it != NavDestination.ADMIN }.toTypedArray()
@@ -400,7 +429,7 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
                 )
                 
                 NavDestination.ADMIN -> {
-                    if (activeUser.email.equals("hashem714pro@gmail.com", ignoreCase = true)) {
+                    if (com.example.util.AdminPolicy.isAdmin(activeUser)) {
                         com.example.ui.screens.AdminDashboardScreen(
                             viewModel = viewModel,
                             onNavigateToUserApp = {
@@ -481,10 +510,4 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
             }
         )
     }
-}
-
-// Keep Greeting composable so GreetingScreenshotTest remains compatible
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(text = "Hello $name!", modifier = modifier)
 }

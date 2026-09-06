@@ -21,12 +21,13 @@ service cloud.firestore {
       // Anyone can read reports
       allow read: if true;
       
-      // Creating a report
+      // Creating a report (the client must stamp its own verified email as userEmail)
       allow create: if isAuthenticated() 
                     && request.resource.data.imei1 is string 
                     && request.resource.data.imei1.size() == 15 
                     && request.resource.data.modelName is string
-                    && request.resource.data.district is string;
+                    && request.resource.data.district is string
+                    && request.resource.data.userEmail == request.auth.token.email;
 
       // Updating a report (only owner or admin)
       allow update: if isAdmin() || (isAuthenticated() && request.auth.token.email == resource.data.userEmail);
@@ -40,8 +41,26 @@ service cloud.firestore {
       // Anyone can read alerts
       allow read: if true;
       
-      // Only Admin can create, update, or delete alerts
-      allow create, update, delete: if isAdmin();
+      // Any signed-in user may broadcast an alert for a report they file;
+      // only Admin can edit or remove alerts.
+      allow create: if isAuthenticated()
+                    && request.resource.data.title is string
+                    && request.resource.data.message is string;
+      allow update, delete: if isAdmin();
+    }
+
+    // Queue consumed by the FCM backend trigger (write-only for clients)
+    match /fcm_broadcast_queue/{itemId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // Device push tokens: each client only writes its own document
+    match /fcm_device_tokens/{tokenId} {
+      allow read: if isAdmin();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
     }
 
     // Users Collection

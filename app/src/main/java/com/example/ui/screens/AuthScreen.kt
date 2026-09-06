@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
+import com.example.util.PasswordHasher
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -94,8 +95,9 @@ import com.example.ui.theme.PrimaryBlue
 import com.example.ui.theme.PrimaryBlueVariant
 import com.example.util.AuthManager
 import com.example.util.AuthResult
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AuthScreen(
@@ -162,45 +164,49 @@ fun AuthScreen(
                         }
                     }
 
-                    // Fallback / Local Room persistence
+                    // Fallback / Local Room persistence (offline mode).
+                    // Admin privileges are only granted through Firebase-verified sign-in.
+                    if (com.example.util.AdminPolicy.isAdminEmail(cleanEmail)) {
+                        isLoading = false
+                        errorMessage = "حساب المشرف يتطلب الاتصال بالإنترنت والمصادقة عبر Firebase"
+                        return@launch
+                    }
+
                     val existingUser = onFindUser(cleanEmail)
 
                     if (selectedTab == 0) {
-                        // Login mode
-                        if (existingUser != null) {
-                            if (existingUser.passwordHash.isNotEmpty() && existingUser.passwordHash != password) {
-                                errorMessage = "كلمة المرور غير صحيحة، يرجى التأكد وإعادة المحاولة"
-                                isLoading = false
-                                return@launch
-                            }
-                            delay(400)
+                        // Login mode: the account MUST already exist locally with a matching password
+                        if (existingUser == null || existingUser.authProvider != "EMAIL") {
                             isLoading = false
-                            Toast.makeText(context, "أهلاً بك مجدداً يا ${existingUser.fullName}", Toast.LENGTH_SHORT).show()
-                            onAuthSuccess(existingUser)
-                        } else {
-                            // User not registered yet in local DB: authenticate them and register their profile
-                            delay(400)
-                            val derivedName = cleanEmail.substringBefore("@")
-                                .replace(".", " ")
-                                .replace("_", " ")
-                                .replaceFirstChar { it.uppercase() }
-                            val newUser = AppUser(
-                                email = cleanEmail,
-                                fullName = derivedName,
-                                passwordHash = password,
-                                authProvider = "EMAIL"
-                            )
-                            isLoading = false
-                            Toast.makeText(context, "تم تسجيل الدخول بنجاح بحساب $cleanEmail", Toast.LENGTH_SHORT).show()
-                            onAuthSuccess(newUser)
+                            errorMessage = "لا يوجد حساب بهذا البريد على هذا الجهاز. يرجى إنشاء حساب جديد أولاً"
+                            return@launch
                         }
+                        val passwordOk = withContext(Dispatchers.Default) { PasswordHasher.verify(password, existingUser.passwordHash) }
+                        if (!passwordOk) {
+                            isLoading = false
+                            errorMessage = "كلمة المرور غير صحيحة، يرجى التأكد وإعادة المحاولة"
+                            return@launch
+                        }
+                        // Transparently upgrade legacy plaintext records to a salted hash
+                        val upgradedUser = if (PasswordHasher.isHashed(existingUser.passwordHash)) {
+                            existingUser
+                        } else {
+                            existingUser.copy(passwordHash = withContext(Dispatchers.Default) { PasswordHasher.hash(password) })
+                        }
+                        isLoading = false
+                        Toast.makeText(context, "أهلاً بك مجدداً يا ${upgradedUser.fullName}", Toast.LENGTH_SHORT).show()
+                        onAuthSuccess(upgradedUser)
                     } else {
-                        // Register mode
-                        delay(400)
+                        // Register mode: refuse to overwrite an existing account
+                        if (existingUser != null) {
+                            isLoading = false
+                            errorMessage = "هذا البريد مسجل مسبقاً، يرجى تسجيل الدخول بدلاً من إنشاء حساب"
+                            return@launch
+                        }
                         val newUser = AppUser(
                             email = cleanEmail,
                             fullName = fullName.trim(),
-                            passwordHash = password,
+                            passwordHash = withContext(Dispatchers.Default) { PasswordHasher.hash(password) },
                             authProvider = "EMAIL"
                         )
                         isLoading = false

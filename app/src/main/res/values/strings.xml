@@ -3,5 +3,10 @@
     <string name="app_tagline">المنصة اليمنية للبلاغات عن الجوالات المسروقة والمفقودة</string>
     <string name="developer_credit">تم التطوير والإنشاء بواسطة هاشم القديمي</string>
     <string name="developer_phone">714525890</string>
-    <string name="default_web_client_id" translatable="false">644465972998-ql4n8ljrldlpnubqdjs6pkeht4grr3bf.apps.googleusercontent.com</string>
+    <!--
+        Google Sign-In web client ID. When google-services.json is present the
+        google-services plugin generates `default_web_client_id` automatically, so it
+        is declared here under a different name to avoid a duplicate-resource build error.
+    -->
+    <string name="fallback_web_client_id" translatable="false">644465972998-ql4n8ljrldlpnubqdjs6pkeht4grr3bf.apps.googleusercontent.com</string>
 </resources>

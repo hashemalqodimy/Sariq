@@ -61,6 +61,22 @@ fun BarcodeScannerScreen(
     }
 
     if (hasCameraPermission) {
+        // Owned by the composable so they can be released when the scanner leaves composition
+        val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
+        val analyzer = remember { BarcodeAnalyzer { barcode -> onBarcodeScanned(barcode) } }
+        var boundProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+        DisposableEffect(Unit) {
+            onDispose {
+                try {
+                    boundProvider?.unbindAll()
+                } catch (_: Exception) {
+                }
+                analyzer.close()
+                cameraExecutor.shutdown()
+            }
+        }
+
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             AndroidView(
                 factory = { ctx ->
@@ -70,11 +86,11 @@ fun BarcodeScannerScreen(
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
                     }
-                    val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
                     val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
 
                     cameraProviderFuture.addListener({
                         val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+                        boundProvider = cameraProvider
 
                         val preview = Preview.Builder().build().also {
                             it.setSurfaceProvider(previewView.surfaceProvider)
@@ -84,9 +100,7 @@ fun BarcodeScannerScreen(
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                             .build()
                             .also {
-                                it.setAnalyzer(cameraExecutor, BarcodeAnalyzer { barcode ->
-                                    onBarcodeScanned(barcode)
-                                })
+                                it.setAnalyzer(cameraExecutor, analyzer)
                             }
 
                         val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA

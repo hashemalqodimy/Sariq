@@ -232,12 +232,10 @@ class AmanPhoneViewModel(
         viewModelScope.launch {
             _imeiCheckState.value = ImeiCheckState.Loading
             val (foundReport, isStolen) = repository.checkImei(input)
-            if (isStolen && foundReport != null) {
-                _imeiCheckState.value = ImeiCheckState.StolenFound(foundReport)
-            } else if (foundReport != null && foundReport.status == "تم الاسترجاع") {
-                _imeiCheckState.value = ImeiCheckState.Clean(input)
+            _imeiCheckState.value = if (isStolen && foundReport != null) {
+                ImeiCheckState.StolenFound(foundReport)
             } else {
-                _imeiCheckState.value = ImeiCheckState.Clean(input)
+                ImeiCheckState.Clean(input)
             }
         }
     }
@@ -362,20 +360,20 @@ class AmanPhoneViewModel(
 
     fun deleteReportByAdmin(imei: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
-            val cloudSuccess = repository.cloudSyncManager.deleteReportInCloud(imei)
-            
-            // Delete locally in all cases (so UI updates even if cloud fails)
-            val allLocals = allReports.value
-            val match = allLocals.firstOrNull { it.imei1 == imei || it.imei2 == imei }
+            val cleanImei = imei.filter { it.isDigit() }
+            val cloudSuccess = repository.cloudSyncManager.deleteReportInCloud(cleanImei)
+
+            // Delete locally in all cases (so UI updates even if cloud fails).
+            // deleteReportLocal also records a tombstone so the periodic sync
+            // does not re-insert the report from the public feeds.
+            val match = allReports.value.firstOrNull { it.imei1 == cleanImei || it.imei2 == cleanImei }
             if (match != null) {
                 repository.deleteReportLocal(match)
-                repository.syncNow(false)
                 onSuccess()
-            } else if (!cloudSuccess) {
-                onError("فشل في حذف البلاغ السحابي (أو غير موجود محلياً).")
+            } else if (cloudSuccess) {
+                onSuccess()
             } else {
-                repository.syncNow(false)
-                onSuccess()
+                onError("فشل في حذف البلاغ السحابي (أو غير موجود محلياً).")
             }
         }
     }
