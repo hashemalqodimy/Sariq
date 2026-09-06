@@ -27,5 +27,6 @@ data class PhoneReport(
     val status: String = "مسروق", // مسروق, مفقود, تم الاسترجاع, قيد التحري
     val createdAt: Long = System.currentTimeMillis(),
     val isUrgent: Boolean = true,
+    val userEmail: String = "",
     val proofImageUrl: String = ""
 )

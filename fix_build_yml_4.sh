@@ -1,0 +1,1 @@
+sed -i 's/echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > debug.keystore 2>\/dev\/null || true/echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > debug.keystore 2>\/dev\/null || true\n          echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > app\/google-services.json 2>\/dev\/null || true/g' .github/workflows/build.yml

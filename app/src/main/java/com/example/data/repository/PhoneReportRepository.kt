@@ -22,9 +22,9 @@ class PhoneReportRepository(
     val cloudSyncManager = CloudSyncManager(context)
 
     val allReports: Flow<List<PhoneReport>> = dao.getAllReports()
-    val myReports: Flow<List<PhoneReport>> = dao.getAllReports()
-    val stolenReports: Flow<List<PhoneReport>> = dao.getAllReports()
-    val recoveredReports: Flow<List<PhoneReport>> = dao.getAllReports()
+    fun getMyReports(email: String): Flow<List<PhoneReport>> = dao.getReportsByUser(email)
+    val stolenReports: Flow<List<PhoneReport>> = dao.getReportsByStatus("مسروق")
+    val recoveredReports: Flow<List<PhoneReport>> = dao.getReportsByStatus("تم الاسترجاع")
     
     val allAlerts: Flow<List<UrgentAlert>> = alertDao.getAllAlerts()
     val unreadAlertsCount: Flow<Int> = alertDao.getUnreadCount()
@@ -69,6 +69,14 @@ class PhoneReportRepository(
             cloudReports.forEach { 
                 dao.insertReport(it)
                 newCount++
+            }
+            val cloudAlerts = cloudSyncManager.fetchCloudAlerts()
+            val existingAlerts = alertDao.getAllAlerts().first()
+            cloudAlerts.forEach { alert ->
+                if (existingAlerts.none { it.title == alert.title && it.timestamp == alert.timestamp }) {
+                    alertDao.insertAlert(alert)
+                    newCount++
+                }
             }
         } else {
             val local = dao.getAllReports().first()

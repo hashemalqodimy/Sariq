@@ -195,7 +195,7 @@ class AuthManager(private val context: Context) {
                 val user = AppUser(
                     email = fbUser?.email ?: email,
                     fullName = fullName,
-                    passwordHash = password,
+                    
                     authProvider = "EMAIL",
                     lastLoginAt = System.currentTimeMillis()
                 )

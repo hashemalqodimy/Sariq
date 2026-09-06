@@ -18,8 +18,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Phone
+
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -45,7 +46,7 @@ fun DeveloperCreditCard(
     compact: Boolean = false
 ) {
     val context = LocalContext.current
-    val phone = "714525890"
+    val email = "support@aman-phone.ye"
 
     Card(
         modifier = modifier
@@ -53,7 +54,7 @@ fun DeveloperCreditCard(
             .clip(RoundedCornerShape(16.dp))
             .clickable {
                 try {
-                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                    val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email"))
                     context.startActivity(intent)
                 } catch (_: Exception) {}
             },
@@ -138,14 +139,14 @@ fun DeveloperCreditCard(
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Phone,
+                        imageVector = Icons.Default.Email,
                         contentDescription = null,
                         tint = AccentGold,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = phone,
+                        text = email,
                         color = AccentGold,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp

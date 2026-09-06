@@ -19,6 +19,8 @@ interface ReportDao {
 
     @Query("SELECT * FROM phone_reports WHERE status = :status ORDER BY createdAt DESC")
     fun getReportsByStatus(status: String): Flow<List<PhoneReport>>
+    @Query("SELECT * FROM phone_reports WHERE userEmail = :email ORDER BY createdAt DESC")
+    fun getReportsByUser(email: String): Flow<List<PhoneReport>>
 
     @Query("SELECT * FROM phone_reports WHERE id = :id")
     fun getReportById(id: Long): Flow<PhoneReport?>

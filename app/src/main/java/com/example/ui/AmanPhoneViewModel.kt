@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,6 +34,8 @@ class AmanPhoneViewModel(
     // Current User Session
     private val _currentUser = MutableStateFlow<com.example.data.model.AppUser?>(null)
     val currentUser: StateFlow<com.example.data.model.AppUser?> = _currentUser.asStateFlow()
+    private val _isAdmin = MutableStateFlow(false)
+    val isAdmin: StateFlow<Boolean> = _isAdmin.asStateFlow()
 
     private val _isUserLoading = MutableStateFlow(true)
     val isUserLoading: StateFlow<Boolean> = _isUserLoading.asStateFlow()
@@ -78,17 +81,27 @@ class AmanPhoneViewModel(
 
     fun onUserLogin(user: com.example.data.model.AppUser, onBanned: (() -> Unit)? = null) {
         viewModelScope.launch {
-            // Check if user is banned
-            val isBanned = false
+            val isBanned = repository.cloudSyncManager.checkBanStatus(user.email)
             if (isBanned) {
                 onBanned?.invoke()
                 return@launch
             }
             
-            val updatedUser = user.copy(lastLoginAt = System.currentTimeMillis())
-            repository.saveUser(updatedUser)
-            
-            _currentUser.value = updatedUser
+            // Check Admin Claim
+            try {
+                val fbUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                if (fbUser != null) {
+                    val tokenResult = fbUser.getIdToken(false).await()
+                    val adminClaim = tokenResult.claims["admin"] as? Boolean ?: false
+                    _isAdmin.value = adminClaim
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("Auth", "Failed to get admin claim", e)
+            }
+
+            repository.saveUser(user)
+            _currentUser.value = user
+            syncNow()
         }
     }
 
@@ -113,6 +126,10 @@ class AmanPhoneViewModel(
 
     // Reports Feed
     val allReports: StateFlow<List<PhoneReport>> = repository.allReports.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val myReports: StateFlow<List<PhoneReport>> = combine(repository.allReports, _currentUser) { reports, user ->
+        reports.filter { it.userEmail == user?.email }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val filteredReports: StateFlow<List<PhoneReport>> = combine(
         repository.allReports,
@@ -299,6 +316,7 @@ class AmanPhoneViewModel(
             }
 
             val report = PhoneReport(
+                userEmail = currentUser.value?.email ?: "",
                 brand = brand,
                 modelName = model,
                 imei1 = imei1,

@@ -168,6 +168,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
+    val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
     val isUserLoading by viewModel.isUserLoading.collectAsStateWithLifecycle()
     var showAppInfoDialog by remember { mutableStateOf(false) }
 
@@ -326,7 +327,7 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
                 tonalElevation = 6.dp,
                 modifier = Modifier.testTag("main_bottom_nav")
             ) {
-                val destinations = if (activeUser.email.equals("hashem714pro@gmail.com", ignoreCase = true)) {
+                val destinations = if (isAdmin) {
                     NavDestination.values()
                 } else {
                     NavDestination.values().filter { it != NavDestination.ADMIN }.toTypedArray()
@@ -400,7 +401,7 @@ fun AmanPhoneMainApp(viewModel: AmanPhoneViewModel) {
                 )
                 
                 NavDestination.ADMIN -> {
-                    if (activeUser.email.equals("hashem714pro@gmail.com", ignoreCase = true)) {
+                    if (isAdmin) {
                         com.example.ui.screens.AdminDashboardScreen(
                             viewModel = viewModel,
                             onNavigateToUserApp = {

@@ -6,6 +6,9 @@ import android.util.Log
 import com.example.data.model.AppUser
 import com.example.data.model.PhoneReport
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.storage.FirebaseStorage
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -14,12 +17,28 @@ class CloudSyncManager(private val context: Context) {
     private val db = FirebaseFirestore.getInstance()
     private val TAG = "CloudSyncManager"
 
-    suspend fun uploadProofImage(uri: Uri): String? {
-        return "https://mock-image-url.com/proof.jpg"
+    suspend fun uploadProofImage(uri: Uri): String? = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
+            val fileName = "${UUID.randomUUID()}.jpg"
+            val ref = FirebaseStorage.getInstance().reference.child("proofs/$uid/$fileName")
+            ref.putFile(uri).await()
+            ref.downloadUrl.await().toString()
+        } catch (e: Exception) {
+            Log.w(TAG, "Upload failed: ${e.message}")
+            null
+        }
     }
 
     suspend fun fetchAllUsersFromCloud(): List<AppUser> = withContext(Dispatchers.IO) {
         return@withContext emptyList()
+    }
+
+    suspend fun checkBanStatus(email: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val doc = db.collection("users").document(email).get().await()
+            return@withContext doc.getBoolean("isBanned") ?: false
+        } catch (e: Exception) { return@withContext false }
     }
 
     suspend fun updateUserBanStatusInCloud(email: String, isBanned: Boolean): Boolean = withContext(Dispatchers.IO) {
@@ -31,7 +50,20 @@ class CloudSyncManager(private val context: Context) {
     }
 
     suspend fun publishUrgentAlert(title: String, message: String): Boolean = withContext(Dispatchers.IO) {
-        return@withContext true
+        try {
+            val alertData = hashMapOf(
+                "title" to title,
+                "message" to message,
+                "governorate" to "اليمن",
+                "phoneModel" to "تعميم إداري",
+                "timestamp" to System.currentTimeMillis()
+            )
+            db.collection("urgent_alerts").add(alertData).await()
+            return@withContext true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error publishing alert", e)
+            return@withContext false
+        }
     }
 
     suspend fun searchImeiInCloud(imei: String): PhoneReport? = withContext(Dispatchers.IO) {
@@ -56,6 +88,7 @@ class CloudSyncManager(private val context: Context) {
                     description = doc.getString("description") ?: "",
                     rewardAmount = reward,
                     isUrgent = doc.getBoolean("isUrgent") ?: true,
+                        userEmail = doc.getString("userEmail") ?: "",
                     createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
                     proofImageUrl = doc.getString("proofImageUrl") ?: ""
                 )
@@ -85,6 +118,7 @@ class CloudSyncManager(private val context: Context) {
                     "description" to report.description,
                     "rewardAmount" to report.rewardAmount,
                     "isUrgent" to report.isUrgent,
+                    "userEmail" to report.userEmail,
                     "createdAt" to report.createdAt,
                     "proofImageUrl" to report.proofImageUrl
                 )
@@ -111,7 +145,6 @@ class CloudSyncManager(private val context: Context) {
                         color = doc.getString("color") ?: "",
                         status = doc.getString("status") ?: "مفقود",
                         contactPhone = doc.getString("contactPhone") ?: "",
-                        whatsappNumber = doc.getString("whatsappNumber") ?: "",
                         ownerName = doc.getString("ownerName") ?: "",
                         governorate = doc.getString("governorate") ?: "",
                         district = doc.getString("district") ?: "",
@@ -119,6 +152,7 @@ class CloudSyncManager(private val context: Context) {
                         description = doc.getString("description") ?: "",
                         rewardAmount = reward,
                         isUrgent = doc.getBoolean("isUrgent") ?: true,
+                        userEmail = doc.getString("userEmail") ?: "",
                         createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
                         proofImageUrl = doc.getString("proofImageUrl") ?: ""
                     )
@@ -128,5 +162,37 @@ class CloudSyncManager(private val context: Context) {
             Log.w(TAG, "Error fetching reports: ${e.message}")
         }
         reports
+    }
+
+    suspend fun fetchCloudAlerts(): List<com.example.data.model.UrgentAlert> = withContext(Dispatchers.IO) {
+        val alerts = mutableListOf<com.example.data.model.UrgentAlert>()
+        try {
+            val snapshot = db.collection("urgent_alerts").get().await()
+            for (doc in snapshot.documents) {
+                val title = doc.getString("title") ?: ""
+                val message = doc.getString("message") ?: ""
+                val gov = doc.getString("governorate") ?: "اليمن"
+                val model = doc.getString("phoneModel") ?: "تعميم إداري"
+                val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                
+                alerts.add(
+                    com.example.data.model.UrgentAlert(
+                        id = 0L,
+                        reportId = 0L,
+                        title = title,
+                        message = message,
+                        governorate = gov,
+                        phoneModel = model,
+                        imeiSnippet = "",
+                        timestamp = timestamp,
+                        isRead = false,
+                        severity = "CRITICAL"
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error fetching alerts: ${e.message}")
+        }
+        alerts
     }
 }

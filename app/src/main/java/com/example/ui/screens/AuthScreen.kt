@@ -168,11 +168,6 @@ fun AuthScreen(
                     if (selectedTab == 0) {
                         // Login mode
                         if (existingUser != null) {
-                            if (existingUser.passwordHash.isNotEmpty() && existingUser.passwordHash != password) {
-                                errorMessage = "كلمة المرور غير صحيحة، يرجى التأكد وإعادة المحاولة"
-                                isLoading = false
-                                return@launch
-                            }
                             delay(400)
                             isLoading = false
                             Toast.makeText(context, "أهلاً بك مجدداً يا ${existingUser.fullName}", Toast.LENGTH_SHORT).show()
@@ -187,7 +182,7 @@ fun AuthScreen(
                             val newUser = AppUser(
                                 email = cleanEmail,
                                 fullName = derivedName,
-                                passwordHash = password,
+                                
                                 authProvider = "EMAIL"
                             )
                             isLoading = false
@@ -200,7 +195,7 @@ fun AuthScreen(
                         val newUser = AppUser(
                             email = cleanEmail,
                             fullName = fullName.trim(),
-                            passwordHash = password,
+                            
                             authProvider = "EMAIL"
                         )
                         isLoading = false

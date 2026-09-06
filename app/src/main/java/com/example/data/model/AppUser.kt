@@ -8,7 +8,6 @@ data class AppUser(
     @PrimaryKey
     val email: String,
     val fullName: String,
-    val passwordHash: String = "",
     val authProvider: String = "EMAIL", // "EMAIL", "GOOGLE"
     val avatarUrl: String = "",
     val phone: String = "",
