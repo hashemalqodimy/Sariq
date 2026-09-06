@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 @Database(
     entities = [PhoneReport::class, UrgentAlert::class, ImeiCheckRecord::class, AppUser::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AmanPhoneDatabase : RoomDatabase() {

@@ -1,10 +1,7 @@
+cat << 'INNER_EOF' > app/src/main/java/com/example/data/repository/PhoneReportRepository.kt
 package com.example.data.repository
 
-import android.content.Context
-import com.example.data.local.AlertDao
-import com.example.data.local.ImeiCheckDao
-import com.example.data.local.ReportDao
-import com.example.data.local.UserDao
+import com.example.data.local.AmanPhoneDatabase
 import com.example.data.model.AppUser
 import com.example.data.model.PhoneReport
 import com.example.data.model.UrgentAlert
@@ -13,28 +10,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
 class PhoneReportRepository(
-    private val dao: ReportDao,
-    private val alertDao: AlertDao,
-    private val imeiCheckDao: ImeiCheckDao,
-    private val userDao: UserDao,
-    context: Context
+    private val db: AmanPhoneDatabase,
+    val cloudSyncManager: CloudSyncManager
 ) {
-    val cloudSyncManager = CloudSyncManager(context)
+    private val dao = db.reportDao()
+    private val alertDao = db.alertDao()
+    private val userDao = db.userDao()
 
     val allReports: Flow<List<PhoneReport>> = dao.getAllReports()
-    val myReports: Flow<List<PhoneReport>> = dao.getAllReports()
-    val stolenReports: Flow<List<PhoneReport>> = dao.getAllReports()
-    val recoveredReports: Flow<List<PhoneReport>> = dao.getAllReports()
+    val myReports: Flow<List<PhoneReport>> = dao.getMyReports()
+    val stolenReports: Flow<List<PhoneReport>> = dao.getStolenReports()
+    val recoveredReports: Flow<List<PhoneReport>> = dao.getRecoveredReports()
     
     val allAlerts: Flow<List<UrgentAlert>> = alertDao.getAllAlerts()
-    val unreadAlertsCount: Flow<Int> = alertDao.getUnreadCount()
-    val totalReportsCount: Flow<Int> = dao.getTotalReportsCount()
-    val recoveredReportsCount: Flow<Int> = dao.getRecoveredReportsCount()
-    val recentImeiChecks = imeiCheckDao.getRecentChecks()
-
-    suspend fun getLastActiveUser(): AppUser? = userDao.getLastActiveUser()
-    suspend fun getUserByEmail(email: String): AppUser? = userDao.getUserByEmail(email)
-    suspend fun saveUser(user: AppUser) = userDao.insertUser(user)
 
     suspend fun submitReport(report: PhoneReport) {
         dao.insertReport(report)
@@ -42,7 +30,8 @@ class PhoneReportRepository(
     }
 
     suspend fun updateReportStatus(reportId: Long, newStatus: String, phoneModel: String, gov: String) {
-        dao.updateStatus(reportId, newStatus)
+        dao.updateReportStatus(reportId, newStatus)
+        // Also update cloud if necessary
     }
 
     suspend fun deleteReportLocal(report: PhoneReport) {
@@ -50,7 +39,7 @@ class PhoneReportRepository(
     }
 
     suspend fun checkImei(imei: String): Pair<PhoneReport?, Boolean> {
-        val foundLocally = dao.findReportByExactImei(imei)
+        val foundLocally = dao.searchByImeiDirect(imei)
         if (foundLocally != null) {
             return Pair(foundLocally, foundLocally.status != "تم الاسترجاع")
         }
@@ -62,21 +51,17 @@ class PhoneReportRepository(
         return Pair(null, false)
     }
     
-    suspend fun syncNow(showNotificationForNewAlerts: Boolean): Int {
-        var newCount = 0
-        if (showNotificationForNewAlerts) {
+    suspend fun syncNow(forceCloud: Boolean) {
+        if (forceCloud) {
             val cloudReports = cloudSyncManager.fetchCloudReports()
-            cloudReports.forEach { 
-                dao.insertReport(it)
-                newCount++
-            }
+            cloudReports.forEach { dao.insertReport(it) }
         } else {
             val local = dao.getAllReports().first()
             cloudSyncManager.syncLocalReportsToCloud(local)
         }
-        return newCount
     }
     
+    // Alerts
     suspend fun markAlertAsRead(alertId: Long) {
         alertDao.markAsRead(alertId)
     }
@@ -85,3 +70,4 @@ class PhoneReportRepository(
         alertDao.markAllAsRead()
     }
 }
+INNER_EOF

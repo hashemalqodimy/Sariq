@@ -1,0 +1,1 @@
+sed -i 's/androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()/androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()/g' app/src/main/java/com/example/ui/screens/NewReportScreen.kt

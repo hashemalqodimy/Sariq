@@ -1,3 +1,4 @@
+cat << 'INNER_EOF' > app/src/main/java/com/example/util/AmanSyncReceiver.kt
 package com.example.util
 
 import android.content.BroadcastReceiver
@@ -10,3 +11,4 @@ class AmanSyncReceiver : BroadcastReceiver() {
         Log.d("AmanSyncReceiver", "Sync triggered")
     }
 }
+INNER_EOF

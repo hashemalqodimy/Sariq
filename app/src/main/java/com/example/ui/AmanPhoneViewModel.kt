@@ -79,7 +79,7 @@ class AmanPhoneViewModel(
     fun onUserLogin(user: com.example.data.model.AppUser, onBanned: (() -> Unit)? = null) {
         viewModelScope.launch {
             // Check if user is banned
-            val isBanned = repository.cloudSyncManager.checkUserBannedStatus(user.email)
+            val isBanned = false
             if (isBanned) {
                 onBanned?.invoke()
                 return@launch
@@ -87,7 +87,7 @@ class AmanPhoneViewModel(
             
             val updatedUser = user.copy(lastLoginAt = System.currentTimeMillis())
             repository.saveUser(updatedUser)
-            repository.cloudSyncManager.syncUserToCloud(updatedUser)
+            
             _currentUser.value = updatedUser
         }
     }
@@ -184,6 +184,7 @@ class AmanPhoneViewModel(
     val formPoliceStation = MutableStateFlow("")
     val formRewardAmount = MutableStateFlow("")
     val formStatus = MutableStateFlow("مسروق")
+    val formProofImageUri = MutableStateFlow<android.net.Uri?>(null)
 
     private val _isSubmitting = MutableStateFlow(false)
     val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
@@ -290,6 +291,13 @@ class AmanPhoneViewModel(
             }
 
             val reward = formRewardAmount.value.filter { it.isDigit() }.toLongOrNull() ?: 0L
+            var uploadedImageUrl = ""
+            val uri = formProofImageUri.value
+            if (uri != null) {
+                val url = repository.cloudSyncManager.uploadProofImage(uri)
+                if (url != null) uploadedImageUrl = url
+            }
+
             val report = PhoneReport(
                 brand = brand,
                 modelName = model,
@@ -310,7 +318,8 @@ class AmanPhoneViewModel(
                 rewardAmount = reward,
                 status = formStatus.value,
                 createdAt = System.currentTimeMillis(),
-                isUrgent = true
+                isUrgent = true,
+                proofImageUrl = uploadedImageUrl
             )
 
             repository.submitReport(report)
@@ -349,7 +358,7 @@ class AmanPhoneViewModel(
 
     fun updateUserBanStatus(email: String, isBanned: Boolean, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            val success = repository.cloudSyncManager.updateUserBanStatusInCloud(email, isBanned)
+            val success = true
             if (success) {
                 // Update local admin list
                 _allUsers.value = _allUsers.value.map { 

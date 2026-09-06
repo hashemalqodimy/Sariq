@@ -1,0 +1,1 @@
+sed -i 's/incidentDate = doc.getLong("incidentDate") ?: System.currentTimeMillis(),/incidentDate = doc.getLong("incidentDate")?.toString() ?: "",/g' app/src/main/java/com/example/util/CloudSyncManager.kt

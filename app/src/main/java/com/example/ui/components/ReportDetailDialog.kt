@@ -52,8 +52,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.PhoneReport
 import com.example.ui.theme.AlertRed
+import com.example.ui.theme.AlertRedLight
 import com.example.ui.theme.PrimaryBlue
 import com.example.ui.theme.SuccessGreen
+import com.example.ui.theme.SuccessGreenLight
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun ReportDetailDialog(
@@ -68,216 +73,175 @@ fun ReportDetailDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Card(
+        Surface(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .testTag("report_detail_dialog"),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                .fillMaxWidth(0.95f)
+                .padding(vertical = 24.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White,
+            tonalElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(scrollState)
+                    .fillMaxWidth()
             ) {
-                // Header with Close
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Header
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF8FAFC))
+                        .padding(16.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(PrimaryBlue.copy(alpha = 0.1f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(imageVector = Icons.Default.PhoneAndroid, contentDescription = null, tint = PrimaryBlue)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "تفاصيل البلاغ",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    color = Color(0xFF1E293B)
+                                )
+                                Text(
+                                    text = SimpleDateFormat("dd/MM/yyyy", Locale("ar", "YE")).format(Date(report.createdAt)),
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+
+                        IconButton(onClick = onDismiss, modifier = Modifier.testTag("close_dialog_button")) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "إغلاق", tint = Color.Gray)
+                        }
+                    }
+                }
+
+                // Content
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                        .padding(20.dp)
+                ) {
+                    // Status Badge
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        StatusBadge(status = report.status, modifier = Modifier.padding(bottom = 16.dp))
+                    }
+
+                    // Device Info section
+                    DetailSection(title = "بيانات الجهاز", icon = Icons.Default.Info) {
+                        DetailRow(label = "الشركة", value = report.brand)
+                        DetailRow(label = "الموديل", value = report.modelName)
+                        DetailRow(label = "الرقم التسلسلي 1 (IMEI)", value = report.imei1, isHighlight = true)
+                        if (report.imei2.isNotEmpty()) {
+                            DetailRow(label = "الرقم التسلسلي 2 (IMEI)", value = report.imei2)
+                        }
+                        DetailRow(label = "اللون", value = report.color)
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                    // Location section
+                    DetailSection(title = "موقع الفقدان/السرقة", icon = Icons.Default.LocationOn) {
+                        DetailRow(label = "المحافظة", value = report.governorate)
+                        DetailRow(label = "المنطقة", value = report.district)
+                        DetailRow(
+                            label = "التاريخ",
+                            value = SimpleDateFormat("dd/MM/yyyy", Locale("ar", "YE")).format(Date(report.incidentDate.toLongOrNull() ?: report.createdAt))
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                    // Contact section
+                    DetailSection(title = "بيانات التواصل", icon = Icons.Default.Person) {
+                        DetailRow(label = "اسم المُبلغ", value = report.ownerName)
+                        if (report.rewardAmount > 0) {
+                            DetailRow(label = "المكافأة المالية", value = "${report.rewardAmount} ريال يمني", isHighlight = true)
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${report.contactPhone}"))
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.weight(1f).height(48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("اتصال")
+                            }
+
+                            if (report.whatsappNumber.isNotEmpty()) {
+                                Button(
+                                    onClick = {
+                                        val url = "https://api.whatsapp.com/send?phone=+967${report.whatsappNumber}"
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                        context.startActivity(intent)
+                                    },
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("واتساب")
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // Actions
+                    if (report.status != "تم الاسترجاع") {
+                        Button(
+                            onClick = { onMarkRecovered(report) },
                             modifier = Modifier
-                                .size(40.dp)
-                                .background(
-                                    if (report.status == "مسروق") AlertRed.copy(alpha = 0.15f) else SuccessGreen.copy(alpha = 0.15f),
-                                    CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .testTag("mark_recovered_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.PhoneAndroid,
-                                contentDescription = null,
-                                tint = if (report.status == "مسروق") AlertRed else SuccessGreen,
-                                modifier = Modifier.size(22.dp)
-                            )
+                            Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("تغيير الحالة إلى: تم الاسترجاع", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "${report.brand} ${report.modelName}",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
-                            )
-                            StatusBadge(status = report.status)
-                        }
-                    }
-
-                    IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "إغلاق")
-                    }
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-                // Reward Banner if exists
-                if (report.rewardAmount > 0) {
-                    Surface(
-                        color = Color(0xFFFEF3C7),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    } else {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = SuccessGreenLight),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text(
-                                text = "🎁 مكافأة مالية معلنة: ",
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF92400E),
-                                fontSize = 13.sp
-                            )
-                            Text(
-                                text = "${String.format("%,d", report.rewardAmount)} ريال يمني",
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color(0xFFB45309),
-                                fontSize = 15.sp
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreen)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("تم استرجاع هذا الجهاز ولله الحمد", color = SuccessGreen, fontWeight = FontWeight.Bold)
+                            }
                         }
-                    }
-                }
-
-                // IMEI Info Card
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "بيانات الهوية الرقمية (IMEI)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        DetailRow(label = "الـ IMEI الأساسي (1):", value = report.imei1, isMono = true)
-                        if (report.imei2.isNotBlank()) {
-                            DetailRow(label = "الـ IMEI الثانوي (2):", value = report.imei2, isMono = true)
-                        }
-                        if (report.serialNumber.isNotBlank()) {
-                            DetailRow(label = "الرقم التسلسلي (S/N):", value = report.serialNumber, isMono = true)
-                        }
-                        DetailRow(label = "اللون والمواصفات:", value = "${report.color} • ${report.storageCapacity}")
-                        if (report.distinctiveFeatures.isNotBlank()) {
-                            DetailRow(label = "علامات فارقة بالجهاز:", value = report.distinctiveFeatures)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Location & Incident details
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.LocationOn, contentDescription = null, tint = AlertRed, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "تفاصيل الحادثة والموقع", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        DetailRow(label = "المحافظة:", value = report.governorate)
-                        DetailRow(label = "مكان الحادثة:", value = report.district)
-                        DetailRow(label = "تاريخ الواقعة:", value = report.incidentDate)
-                        if (report.policeStation.isNotBlank()) {
-                            DetailRow(label = "البلاغ الأمني / المركز:", value = report.policeStation)
-                        }
-                        if (report.description.isNotBlank()) {
-                            DetailRow(label = "وصف وملابسات الحادثة:", value = report.description)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Owner contact info
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "بيانات التواصل بصاحب الهاتف", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        DetailRow(label = "اسم صاحب البلاغ:", value = report.ownerName)
-                        DetailRow(label = "رقم الهاتف المعتمد:", value = report.contactPhone)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Action Buttons: Call, WhatsApp, Share
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = { dialPhone(context, report.contactPhone) },
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("dial_owner_button")
-                    ) {
-                        Icon(imageVector = Icons.Default.Call, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "اتصال", fontSize = 13.sp)
-                    }
-
-                    Button(
-                        onClick = { openWhatsApp(context, report.whatsappNumber.ifEmpty { report.contactPhone }, report) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("whatsapp_owner_button")
-                    ) {
-                        Text(text = "واتساب", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-
-                    OutlinedButton(
-                        onClick = { shareReport(context, report) },
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.testTag("share_report_button")
-                    ) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = "مشاركة", modifier = Modifier.size(18.dp))
-                    }
-                }
-
-                // Recovered Action
-                if (report.status != "تم الاسترجاع") {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { onMarkRecovered(report) },
-                        colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("mark_recovered_button")
-                    ) {
-                        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "تم العثور على الجهاز (تغيير الحالة لمسترجع)", fontSize = 13.sp)
                     }
                 }
             }
@@ -286,61 +250,41 @@ fun ReportDetailDialog(
 }
 
 @Composable
-private fun DetailRow(label: String, value: String, isMono: Boolean = false) {
-    Column(modifier = Modifier.padding(vertical = 3.dp)) {
-        Text(text = label, fontSize = 11.sp, color = Color.Gray)
+private fun DetailSection(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, content: @Composable () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+            Icon(imageVector = icon, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text = title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF334155))
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String, isHighlight: Boolean = false) {
+    if (value.isEmpty()) return
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(text = label, color = Color.Gray, fontSize = 13.sp, modifier = Modifier.weight(1f))
         Text(
             text = value,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
+            fontWeight = if (isHighlight) FontWeight.Bold else FontWeight.Medium,
+            color = if (isHighlight) PrimaryBlue else Color(0xFF1E293B),
+            fontSize = if (isHighlight) 14.sp else 13.sp,
+            modifier = Modifier.weight(1.5f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End
         )
     }
-}
-
-private fun dialPhone(context: Context, phone: String) {
-    try {
-        val cleanPhone = phone.filter { it.isDigit() || it == '+' }
-        val intent = Intent(Intent.ACTION_DIAL).apply {
-            data = Uri.parse("tel:$cleanPhone")
-        }
-        context.startActivity(intent)
-    } catch (e: Exception) {
-        // Fallback
-    }
-}
-
-private fun openWhatsApp(context: Context, phone: String, report: PhoneReport) {
-    try {
-        val cleanPhone = phone.filter { it.isDigit() }
-        val yemenPhone = if (cleanPhone.startsWith("967")) cleanPhone else "967$cleanPhone"
-        val message = "السلام عليكم ورحمة الله، بخصوص بلاغ الهاتف (${report.brand} ${report.modelName}) برقم IMEI: ${report.imei1} المنشور في تطبيق أمان فون اليمن."
-        val url = "https://wa.me/$yemenPhone?text=${Uri.encode(message)}"
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        context.startActivity(intent)
-    } catch (e: Exception) {
-        // Fallback to dialer
-        dialPhone(context, phone)
-    }
-}
-
-private fun shareReport(context: Context, report: PhoneReport) {
-    val shareText = """
-        🚨 تعميم بلاغ هاتف مسروق في الجمهورية اليمنية 🚨
-        - الجهاز: ${report.brand} ${report.modelName}
-        - المحافظة: ${report.governorate} (${report.district})
-        - رقم الـ IMEI: ${report.imei1}
-        ${if (report.rewardAmount > 0) "- مكافأة مالية: ${report.rewardAmount} ريال يمني" else ""}
-        - صاحب البلاغ: ${report.ownerName}
-        - للتواصل: ${report.contactPhone}
-        
-        يرجى من جميع محلات الهواتف والمواطنين الحذر وفحص السيريال عبر تطبيق (أمان فون اليمن).
-    """.trimIndent()
-
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "بلاغ هاتف مسروق - ${report.modelName}")
-        putExtra(Intent.EXTRA_TEXT, shareText)
-    }
-    context.startActivity(Intent.createChooser(intent, "تعميم البلاغ عبر:"))
 }

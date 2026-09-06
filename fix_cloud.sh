@@ -1,10 +1,14 @@
+cat << 'INNER_EOF' > app/src/main/java/com/example/util/CloudSyncManager.kt
 package com.example.util
 
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.example.data.local.AmanPhoneDatabase
 import com.example.data.model.AppUser
 import com.example.data.model.PhoneReport
+import com.example.data.model.UrgentAlert
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -38,8 +42,8 @@ class CloudSyncManager(private val context: Context) {
         try {
             val doc = db.collection("phone_reports").document(imei).get().await()
             if (doc.exists()) {
-                val reward = doc.getLong("rewardAmount") ?: 0L
-                val incident = doc.getString("incidentDate") ?: ""
+                val reward = try { doc.getLong("rewardAmount") ?: 0L } catch(e: Exception) { (doc.getString("rewardAmount")?.toLongOrNull()) ?: 0L }
+                val incident = try { doc.getLong("incidentDate") ?: System.currentTimeMillis() } catch(e: Exception) { System.currentTimeMillis() }
                 return@withContext PhoneReport(
                     imei1 = doc.getString("imei1") ?: "",
                     imei2 = doc.getString("imei2") ?: "",
@@ -100,8 +104,8 @@ class CloudSyncManager(private val context: Context) {
         try {
             val snapshot = db.collection("phone_reports").get().await()
             for (doc in snapshot.documents) {
-                val reward = doc.getLong("rewardAmount") ?: 0L
-                val incident = doc.getString("incidentDate") ?: ""
+                val reward = try { doc.getLong("rewardAmount") ?: 0L } catch(e: Exception) { (doc.getString("rewardAmount")?.toLongOrNull()) ?: 0L }
+                val incident = try { doc.getLong("incidentDate") ?: System.currentTimeMillis() } catch(e: Exception) { System.currentTimeMillis() }
                 reports.add(
                     PhoneReport(
                         imei1 = doc.getString("imei1") ?: "",
@@ -130,3 +134,4 @@ class CloudSyncManager(private val context: Context) {
         reports
     }
 }
+INNER_EOF
